@@ -1,0 +1,47 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Data files
+data/*
+!data/README.md
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.csv
+*.pkl
+*.joblib
+
+# Model checkpoints
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+
+# Outputs
+outputs/*
+!outputs/README.md
+wandb/
+runs/
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+visualization/*.png

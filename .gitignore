@@ -12,6 +12,12 @@ env/
 # Data files
 data/*
 !data/README.md
+!data/splits/
+!data/splits/**
+!data/stats/
+!data/stats/**
+
+# Large data files
 *.h5
 *.hdf5
 *.npy

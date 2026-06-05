@@ -1,0 +1,235 @@
+{
+    "split_type": "iid",
+    "description": "Trajectory-level IID split. Train(0-7), Val(8), Test(9) for all available groups.",
+    "train": [
+        {
+            "group": "ra_1e6_pr_0.5",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "group": "ra_1e6_pr_1",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "group": "ra_1e6_pr_2",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_0.5",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_1",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_2",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_0.5",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_1",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_2",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        }
+    ],
+    "val": [
+        {
+            "group": "ra_1e6_pr_0.5",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e6_pr_1",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e6_pr_2",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_0.5",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_1",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_2",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_0.5",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_1",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_2",
+            "trajectories": [
+                8
+            ]
+        }
+    ],
+    "test": [
+        {
+            "group": "ra_1e6_pr_0.5",
+            "trajectories": [
+                9
+            ]
+        },
+        {
+            "group": "ra_1e6_pr_1",
+            "trajectories": [
+                9
+            ]
+        },
+        {
+            "group": "ra_1e6_pr_2",
+            "trajectories": [
+                9
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_0.5",
+            "trajectories": [
+                9
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_1",
+            "trajectories": [
+                9
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_2",
+            "trajectories": [
+                9
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_0.5",
+            "trajectories": [
+                9
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_1",
+            "trajectories": [
+                9
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_2",
+            "trajectories": [
+                9
+            ]
+        }
+    ]
+}

@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import time
+import argparse
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -14,38 +15,122 @@ from models.operators.fno2d import PlainFNO2d
 from training.metrics import FieldWiseRelativeL2Loss
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Train M3-RelL2 State Prediction model with configurable split/stats."
+    )
+
+    parser.add_argument(
+        "--split",
+        type=str,
+        default="data/splits/iid_split.json",
+        help="Path to split json file, relative to project root."
+    )
+
+    parser.add_argument(
+        "--stats",
+        type=str,
+        default="data/stats/rbc_field_stats.json",
+        help="Path to field stats json file, relative to project root."
+    )
+
+    parser.add_argument(
+        "--run_name",
+        type=str,
+        default="m3_state_iid",
+        help="Run name for checkpoint and wandb."
+    )
+
+    parser.add_argument(
+        "--ckpt_dir",
+        type=str,
+        default="checkpoints/cross_param",
+        help="Checkpoint directory, relative to project root."
+    )
+
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=50
+    )
+
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=16
+    )
+
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=3e-4
+    )
+
+    parser.add_argument(
+        "--weight_decay",
+        type=float,
+        default=1e-4
+    )
+
+    parser.add_argument(
+        "--eta_min",
+        type=float,
+        default=1e-5
+    )
+
+    parser.add_argument(
+        "--no_wandb",
+        action="store_true",
+        help="Disable wandb logging."
+    )
+
+    return parser.parse_args()
+
+
+def resolve_path(project_root, path):
+    if os.path.isabs(path):
+        return path
+    return os.path.abspath(os.path.join(project_root, path))
+
+
 def main():
+    args = parse_args()
+
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    BATCH_SIZE = 16
-    LEARNING_RATE = 3e-4
-    EPOCHS = 50
-    WEIGHT_DECAY = 1e-4
-    ETA_MIN = 1e-5
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-    SPLIT_PATH = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), '..', 'data', 'splits', 'iid_split.json')
-    )
+    BATCH_SIZE = args.batch_size
+    LEARNING_RATE = args.lr
+    EPOCHS = args.epochs
+    WEIGHT_DECAY = args.weight_decay
+    ETA_MIN = args.eta_min
+    RUN_NAME = args.run_name
 
-    STATS_PATH = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), '..', 'data', 'stats', 'rbc_field_stats.json')
-    )
+    SPLIT_PATH = resolve_path(project_root, args.split)
+    STATS_PATH = resolve_path(project_root, args.stats)
+    CKPT_DIR = resolve_path(project_root, args.ckpt_dir)
 
-    CKPT_DIR = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), '..', 'checkpoints', 'controlled')
-    )
     os.makedirs(CKPT_DIR, exist_ok=True)
 
-    BEST_SAVE_PATH = os.path.join(CKPT_DIR, "m3_rel_l2_controlled_best.pth")
+    BEST_SAVE_PATH = os.path.join(CKPT_DIR, f"{RUN_NAME}_best.pth")
 
-    print(f"🚀 [M3-RelL2-Controlled] 启动训练 | 设备: {DEVICE}")
+    print(f"🚀 [M3-RelL2-State] 启动训练 | 设备: {DEVICE}")
+    print(f"📌 Split: {SPLIT_PATH}")
+    print(f"📌 Stats: {STATS_PATH}")
+    print(f"📌 Run name: {RUN_NAME}")
+    print(f"📌 Best checkpoint: {BEST_SAVE_PATH}")
+
+    if args.no_wandb:
+        os.environ["WANDB_MODE"] = "disabled"
 
     wandb.init(
         project="DC-MNO",
-        name="M3-RelL2-Controlled-LR3e4-Cosine-Clip1",
+        name=RUN_NAME,
         config={
-            "experiment_type": "controlled_phase1",
+            "experiment_type": "cross_parameter_or_iid",
             "architecture": "Plain FNO",
+            "prediction_type": "state_prediction",
             "normalization": "Field-wise mean/std",
             "loss_function": "FieldWiseRelativeL2Loss",
             "epochs": EPOCHS,
@@ -55,14 +140,18 @@ def main():
             "scheduler": "CosineAnnealingLR",
             "eta_min": ETA_MIN,
             "grad_clip": 1.0,
-            "split": "iid_split.json",
+            "split": SPLIT_PATH,
             "stats_path": STATS_PATH,
+            "run_name": RUN_NAME,
         }
     )
 
+    if not os.path.exists(SPLIT_PATH):
+        raise FileNotFoundError(f"❌ 找不到 split 文件: {SPLIT_PATH}")
+
     if not os.path.exists(STATS_PATH):
         raise FileNotFoundError(
-            f"❌ 找不到统计量文件: {STATS_PATH}，请先运行 python scripts/compute_field_stats.py"
+            f"❌ 找不到统计量文件: {STATS_PATH}，请先运行 scripts/compute_field_stats.py"
         )
 
     with open(SPLIT_PATH, 'r', encoding='utf-8') as f:
@@ -95,6 +184,9 @@ def main():
         shuffle=False
     )
 
+    print(f"📊 Train samples: {len(train_dataset)}")
+    print(f"📊 Val samples:   {len(val_dataset)}")
+
     model = PlainFNO2d(
         in_channels=16,
         out_channels=4,
@@ -120,7 +212,7 @@ def main():
     best_val_loss = float('inf')
     start_time = time.time()
 
-    print("\n🔥 开始 M3-RelL2-Controlled 训练...")
+    print("\n🔥 开始 M3-RelL2-State 训练...")
     for epoch in range(1, EPOCHS + 1):
         model.train()
 
@@ -204,7 +296,7 @@ def main():
         if epoch % 5 == 0:
             epoch_save_path = os.path.join(
                 CKPT_DIR,
-                f"m3_rel_l2_controlled_epoch_{epoch:02d}.pth"
+                f"{RUN_NAME}_epoch_{epoch:02d}.pth"
             )
 
             torch.save({
@@ -214,10 +306,13 @@ def main():
                 'scheduler_state_dict': scheduler.state_dict(),
                 'val_loss': val_loss,
                 'best_val_loss': best_val_loss,
-                'experiment': 'M3-RelL2-Controlled Field-wise Normalized FNO',
+                'experiment': 'M3-RelL2 State Prediction Field-wise Normalized FNO',
+                'prediction_type': 'state_prediction',
                 'normalization': 'field-wise mean/std',
                 'loss_function': 'FieldWiseRelativeL2Loss',
+                'split_path': SPLIT_PATH,
                 'stats_path': STATS_PATH,
+                'run_name': RUN_NAME,
                 'training_protocol': {
                     'epochs': EPOCHS,
                     'batch_size': BATCH_SIZE,
@@ -241,10 +336,13 @@ def main():
                 'scheduler_state_dict': scheduler.state_dict(),
                 'val_loss': val_loss,
                 'best_val_loss': best_val_loss,
-                'experiment': 'M3-RelL2-Controlled Field-wise Normalized FNO',
+                'experiment': 'M3-RelL2 State Prediction Field-wise Normalized FNO',
+                'prediction_type': 'state_prediction',
                 'normalization': 'field-wise mean/std',
                 'loss_function': 'FieldWiseRelativeL2Loss',
+                'split_path': SPLIT_PATH,
                 'stats_path': STATS_PATH,
+                'run_name': RUN_NAME,
                 'training_protocol': {
                     'epochs': EPOCHS,
                     'batch_size': BATCH_SIZE,
@@ -262,7 +360,7 @@ def main():
 
     total_time = time.time() - start_time
 
-    print(f"\n✅ M3-RelL2-Controlled 训练完成!")
+    print(f"\n✅ M3-RelL2-State 训练完成!")
     print(f"📌 最优模型: {BEST_SAVE_PATH}")
     print(f"⏱️ 总耗时: {total_time / 60:.2f} 分钟")
 

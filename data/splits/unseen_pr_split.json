@@ -1,0 +1,169 @@
+{
+    "split_type": "unseen_pr",
+    "description": "Cross-parameter split. Train/val use Pr=0.5 and Pr=1; test uses unseen Pr=2. Train trajectories 0-7, val trajectory 8, test trajectories 0-9 for unseen Pr groups.",
+    "train": [
+        {
+            "group": "ra_1e6_pr_0.5",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "group": "ra_1e6_pr_1",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_0.5",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_1",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_0.5",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_1",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        }
+    ],
+    "val": [
+        {
+            "group": "ra_1e6_pr_0.5",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e6_pr_1",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_0.5",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_1",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_0.5",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_1",
+            "trajectories": [
+                8
+            ]
+        }
+    ],
+    "test": [
+        {
+            "group": "ra_1e6_pr_2",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_2",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_2",
+            "trajectories": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+            ]
+        }
+    ]
+}

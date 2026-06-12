@@ -21,11 +21,17 @@ class RBCDataset(Dataset):
         normalize=False,
         stats_path=None,
         return_params=False,
+        return_sequence=False,
+        target_steps=1,
     ):
         self.data_path = DATA_PATH
         self.split_config = split_config
         self.normalize = normalize
         self.return_params = return_params
+        self.return_sequence = return_sequence
+        self.target_steps = int(target_steps)
+
+        assert self.target_steps >= 1, "❌ target_steps 必须 >= 1"
 
         if self.normalize:
             assert stats_path is not None, "❌ 开启归一化必须提供 stats_path"
@@ -35,6 +41,7 @@ class RBCDataset(Dataset):
 
         self.inputs = []
         self.targets = []
+        self.target_sequences = []
         self.params = []
 
         self._load_data()
@@ -106,19 +113,30 @@ class RBCDataset(Dataset):
                 if self.return_params:
                     param_vector = self._make_param_vector(group_name)
 
+                max_t = num_steps - CONTEXT_LENGTH - self.target_steps + 1
+
                 for traj_idx in range(num_trajs):
-                    for t in range(num_steps - CONTEXT_LENGTH):
+                    for t in range(max_t):
                         # x_history: [T, C, H, W]
                         x_history = data[traj_idx, t: t + CONTEXT_LENGTH]
 
                         # [T, C, H, W] -> [T*C, H, W]
                         x_history_flat = x_history.reshape(CONTEXT_LENGTH * c, h, w)
 
-                        # y_target: [C, H, W]
+                        # y_target: [C, H, W]，保持旧接口：下一帧
                         y_target = data[traj_idx, t + CONTEXT_LENGTH]
 
                         self.inputs.append(x_history_flat)
                         self.targets.append(y_target)
+
+                        if self.return_sequence:
+                            # y_seq: [target_steps, C, H, W]
+                            # 对 M5-H4 来说就是未来 4 帧: t+1, t+2, t+3, t+4
+                            y_seq = data[
+                                traj_idx,
+                                t + CONTEXT_LENGTH: t + CONTEXT_LENGTH + self.target_steps
+                            ]
+                            self.target_sequences.append(y_seq)
 
                         if self.return_params:
                             self.params.append(param_vector)
@@ -126,12 +144,24 @@ class RBCDataset(Dataset):
         self.inputs = torch.tensor(np.array(self.inputs), dtype=DTYPE)
         self.targets = torch.tensor(np.array(self.targets), dtype=DTYPE)
 
+        if self.return_sequence:
+            self.target_sequences = torch.tensor(
+                np.array(self.target_sequences),
+                dtype=DTYPE
+            )
+
         if self.return_params:
             self.params = torch.tensor(np.array(self.params), dtype=DTYPE)
 
         print(f"✅ 加载完毕！共生成 {len(self.inputs)} 个样本对。")
         print(f"👉 输入 X 形状: {self.inputs[0].shape} (应为 [{CONTEXT_LENGTH * 4}, 256, 64])")
         print(f"👉 目标 Y 形状: {self.targets[0].shape} (应为 [4, 256, 64])")
+
+        if self.return_sequence:
+            print(
+                f"👉 目标序列 Y_seq 形状: {self.target_sequences[0].shape} "
+                f"(应为 [{self.target_steps}, 4, 256, 64])"
+            )
 
         if self.return_params:
             print(f"👉 参数 param 形状: {self.params[0].shape} (应为 [2])")
@@ -144,9 +174,27 @@ class RBCDataset(Dataset):
         x = self.inputs[idx]
         y = self.targets[idx]
 
+        if self.return_sequence:
+            y_seq = self.target_sequences[idx]
+
         if self.normalize:
             x = self.normalizer.normalize_x(x)
             y = self.normalizer.normalize_y(y)
+
+            if self.return_sequence:
+                # y_seq: [S, C, H, W]
+                # 为了兼容现有 FieldWiseNormalizer，这里逐帧 normalize_y
+                y_seq = torch.stack(
+                    [self.normalizer.normalize_y(y_seq[s]) for s in range(self.target_steps)],
+                    dim=0
+                )
+
+        if self.return_sequence and self.return_params:
+            param = self.params[idx]
+            return x, y, y_seq, param
+
+        if self.return_sequence:
+            return x, y, y_seq
 
         if self.return_params:
             param = self.params[idx]

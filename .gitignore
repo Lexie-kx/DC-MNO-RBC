@@ -51,3 +51,9 @@ Thumbs.db
 # Jupyter
 .ipynb_checkpoints/
 visualization/*.png
+
+# Local backup files
+*.bak
+*.bak_*
+*.bak*
+*_backup*

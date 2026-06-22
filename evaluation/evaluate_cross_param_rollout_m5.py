@@ -149,7 +149,7 @@ class RolloutDataset(Dataset):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Cross-parameter rollout evaluation for M0 / M3-Delta / M3-Delta-FiLM / M5-Delta-H4."
+        description="Cross-parameter rollout evaluation for M0 / M3-Delta / M3-Delta-FiLM / M5-Delta-H4 / M5-Delta-FiLM-H4."
     )
 
     parser.add_argument("--split", type=str, required=True)
@@ -174,6 +174,13 @@ def parse_args():
         type=str,
         required=True,
         help="Checkpoint for M5-Delta-H4."
+    )
+
+    parser.add_argument(
+        "--m5_delta_film_h4_checkpoint",
+        type=str,
+        required=True,
+        help="Checkpoint for M5-Delta-FiLM-H4."
     )
 
     parser.add_argument("--output", type=str, required=True)
@@ -341,6 +348,7 @@ def main():
     m3_delta_ckpt = resolve_path(project_root, args.m3_delta_checkpoint)
     film_ckpt = resolve_path(project_root, args.film_checkpoint)
     m5_delta_h4_ckpt = resolve_path(project_root, args.m5_delta_h4_checkpoint)
+    m5_delta_film_h4_ckpt = resolve_path(project_root, args.m5_delta_film_h4_checkpoint)
     output_path = resolve_path(project_root, args.output)
 
     horizons = [int(x) for x in args.horizons.split(",")]
@@ -355,6 +363,7 @@ def main():
     print(f"📌 M3-Delta checkpoint: {m3_delta_ckpt}")
     print(f"📌 FiLM checkpoint: {film_ckpt}")
     print(f"📌 M5-Delta-H4 checkpoint: {m5_delta_h4_ckpt}")
+    print(f"📌 M5-Delta-FiLM-H4 checkpoint: {m5_delta_film_h4_ckpt}")
     print(f"📌 Horizons: {horizons}")
     print(f"📌 Output: {output_path}")
 
@@ -409,6 +418,18 @@ def main():
     film = load_model_state(film, film_ckpt, device)
     film.eval()
 
+    m5_delta_film_h4 = FiLMFNO2d(
+        in_channels=16,
+        out_channels=4,
+        modes1=16,
+        modes2=16,
+        width=32,
+        film_hidden_dim=64,
+    ).to(device)
+
+    m5_delta_film_h4 = load_model_state(m5_delta_film_h4, m5_delta_film_h4_ckpt, device)
+    m5_delta_film_h4.eval()
+
     stats_dict = {}
 
     print("\n🔥 开始 rollout evaluation...")
@@ -442,6 +463,16 @@ def main():
             # M3-Delta-FiLM
             film_preds = rollout_film(
                 model=film,
+                x0_phys=x0_phys,
+                param=param,
+                normalizer=normalizer,
+                max_horizon=max_horizon,
+            )
+
+            # M5-Delta-FiLM-H4
+            # 结构与 M3-Delta-FiLM 相同，区别是 checkpoint 经过 4-step autoregressive fine-tuning
+            m5_film_preds = rollout_film(
+                model=m5_delta_film_h4,
                 x0_phys=x0_phys,
                 param=param,
                 normalizer=normalizer,
@@ -485,12 +516,20 @@ def main():
                     model_name="M3-Delta-FiLM",
                 )
 
+                update_error_stats(
+                    pred_phys=m5_film_preds[idx],
+                    true_phys=true_h,
+                    stats_dict=stats_dict,
+                    horizon=horizon,
+                    model_name="M5-Delta-FiLM-H4",
+                )
+
             if (batch_idx + 1) % 10 == 0:
                 print(f"  已处理 batch {batch_idx + 1}/{len(loader)}")
 
     rows = []
 
-    model_order = ["M0", "M3-Delta", "M3-Delta-FiLM", "M5-Delta-H4"]
+    model_order = ["M0", "M3-Delta", "M3-Delta-FiLM", "M5-Delta-H4", "M5-Delta-FiLM-H4"]
 
     for model_name in model_order:
         for horizon in horizons:
@@ -612,6 +651,51 @@ def main():
         print("\n================ M5 - M3-Delta Difference: Rel-L2 (%) ================")
         print("说明：负数表示 M5 更好；正数表示 M5 更差。")
         print(delta_df.to_string(index=False))
+
+
+    def print_model_difference(wide_df, model_a, model_b, title):
+        """
+        Print field-wise difference table: model_a - model_b.
+        Negative means model_a is better.
+        """
+        a = wide_df[wide_df["model"] == model_a].copy()
+        b = wide_df[wide_df["model"] == model_b].copy()
+
+        if a.empty or b.empty:
+            print(f"\n⚠️ 跳过差值表：找不到 {model_a} 或 {model_b}")
+            return
+
+        a = a.set_index("horizon")
+        b = b.set_index("horizon")
+
+        diff = a[["buoyancy", "u_x", "u_y", "pressure", "global"]] - b[["buoyancy", "u_x", "u_y", "pressure", "global"]]
+        diff = diff.reset_index()
+        diff = diff[["horizon", "buoyancy", "u_x", "u_y", "pressure", "global"]]
+
+        print(f"\n================ {title}: Rel-L2 (%) ================")
+        print("说明：负数表示前者更好；正数表示前者更差。")
+        print(diff.to_string(index=False))
+
+        # Save difference table next to rollout output
+        diff_name = title.lower()
+        diff_name = diff_name.replace(" ", "_").replace("-", "_").replace(":", "")
+        diff_path = output_path.replace(".csv", f"_{diff_name}.csv")
+        diff.to_csv(diff_path, index=False)
+        print(f"✅ Difference table saved to: {diff_path}")
+
+    print_model_difference(
+        wide_df=wide,
+        model_a="M5-Delta-FiLM-H4",
+        model_b="M5-Delta-H4",
+        title="M5-Delta-FiLM-H4 - M5-Delta-H4"
+    )
+
+    print_model_difference(
+        wide_df=wide,
+        model_a="M5-Delta-FiLM-H4",
+        model_b="M3-Delta",
+        title="M5-Delta-FiLM-H4 - M3-Delta"
+    )
 
 
 if __name__ == "__main__":

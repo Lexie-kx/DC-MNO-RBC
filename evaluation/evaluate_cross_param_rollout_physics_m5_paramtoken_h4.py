@@ -17,6 +17,7 @@ import constants
 from training.normalization import FieldWiseNormalizer
 from models.operators.fno2d import PlainFNO2d
 from models.operators.fno2d_film import FiLMFNO2d
+from models.operators.fno2d_paramtoken import ParamTokenFNO2d
 
 
 DATA_PATH = constants.DATA_PATH
@@ -36,7 +37,7 @@ UY_IDX = FIELD_TO_IDX["u_y"]
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Evaluate rollout physics diagnostics for M0 / M3-Delta / FiLM / M5-Delta-H4 / M5-Delta-FiLM-H4."
+        description="Evaluate rollout physics diagnostics for M0 / M3-Delta / FiLM / M5-Delta-H4 / M5-Delta-FiLM-H4 / M5-Delta-ParameterToken-H4."
     )
 
     parser.add_argument("--split", type=str, required=True)
@@ -46,6 +47,7 @@ def parse_args():
     parser.add_argument("--film_checkpoint", type=str, required=True)
     parser.add_argument("--m5_delta_h4_checkpoint", type=str, required=True)
     parser.add_argument("--m5_delta_film_h4_checkpoint", type=str, required=True)
+    parser.add_argument("--m5_delta_paramtoken_h4_checkpoint", type=str, required=True)
 
     parser.add_argument("--output", type=str, required=True)
 
@@ -508,6 +510,7 @@ def main():
     film_ckpt = resolve_path(project_root, args.film_checkpoint)
     m5_delta_h4_ckpt = resolve_path(project_root, args.m5_delta_h4_checkpoint)
     m5_delta_film_h4_ckpt = resolve_path(project_root, args.m5_delta_film_h4_checkpoint)
+    m5_delta_paramtoken_h4_ckpt = resolve_path(project_root, args.m5_delta_paramtoken_h4_checkpoint)
     output_path = resolve_path(project_root, args.output)
 
     horizons = [int(x) for x in args.horizons.split(",")]
@@ -525,6 +528,7 @@ def main():
     print(f"📌 FiLM checkpoint: {film_ckpt}")
     print(f"📌 M5-Delta-H4 checkpoint: {m5_delta_h4_ckpt}")
     print(f"📌 M5-Delta-FiLM-H4 checkpoint: {m5_delta_film_h4_ckpt}")
+    print(f"📌 M5-Delta-ParameterToken-H4 checkpoint: {m5_delta_paramtoken_h4_ckpt}")
     print(f"📌 Horizons: {horizons}")
     print(f"📌 Stride: {args.stride}")
     print(f"📌 Batch size: {args.batch_size}")
@@ -592,12 +596,28 @@ def main():
 
     m5_delta_film_h4 = load_checkpoint(m5_delta_film_h4, m5_delta_film_h4_ckpt, device)
 
+    m5_delta_paramtoken_h4 = ParamTokenFNO2d(
+        in_channels=CONTEXT_LENGTH * len(FIELD_ORDER),
+        out_channels=len(FIELD_ORDER),
+        modes1=16,
+        modes2=16,
+        width=32,
+        token_hidden_dim=64,
+    ).to(device)
+
+    m5_delta_paramtoken_h4 = load_checkpoint(
+        m5_delta_paramtoken_h4,
+        m5_delta_paramtoken_h4_ckpt,
+        device,
+    )
+
     model_names = [
         "M0",
         "M3-Delta",
         "M3-Delta-FiLM",
         "M5-Delta-H4",
         "M5-Delta-FiLM-H4",
+        "M5-Delta-ParameterToken-H4",
     ]
 
     accum = {
@@ -612,6 +632,7 @@ def main():
     m5_delta_h4.eval()
     film.eval()
     m5_delta_film_h4.eval()
+    m5_delta_paramtoken_h4.eval()
 
     total_batches = len(loader)
 
@@ -656,12 +677,21 @@ def main():
                 max_horizon=max_horizon,
             )
 
+            seq_m5_delta_paramtoken_h4 = rollout_m3_delta_film(
+                model=m5_delta_paramtoken_h4,
+                x0_phys=x0_phys,
+                param=param,
+                normalizer=normalizer,
+                max_horizon=max_horizon,
+            )
+
         pred_dict = {
             "M0": seq_m0,
             "M3-Delta": seq_m3_delta,
             "M3-Delta-FiLM": seq_film,
             "M5-Delta-H4": seq_m5_delta_h4,
             "M5-Delta-FiLM-H4": seq_m5_delta_film_h4,
+            "M5-Delta-ParameterToken-H4": seq_m5_delta_paramtoken_h4,
         }
 
         for h in horizons:

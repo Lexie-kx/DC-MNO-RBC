@@ -1,0 +1,86 @@
+{
+  "experiment_family": "M9-0",
+  "configuration_status": "frozen_before_operator_and_training",
+  "frozen_date": "2026-07-17",
+
+  "field_order": [
+    "buoyancy",
+    "u_x",
+    "u_y",
+    "pressure"
+  ],
+
+  "num_fields": 4,
+  "field_width": 8,
+  "hidden_channels": 8,
+  "qk_channels": 8,
+
+  "score_scale_mode": "sqrt_token_dim",
+  "score_temperature": 0.03,
+  "qk_init_std": 0.02,
+
+  "attention_output_scale": 0.05675224,
+  "shared_scale_for_static_and_dynamic": true,
+  "attention_output_scale_trainable": false,
+
+  "attention_direction": "attention[target_field, source_field]",
+  "softmax_dimension": "source_field",
+  "mask_self_attention": true,
+  "value_projection": "identity_V_equals_h",
+
+  "use_norm": true,
+  "coupling_dropout": 0.0,
+  "residual_gate_type": "per_target_field_sigmoid",
+  "residual_gate_init_logit": -4.0,
+
+  "parameter_token": false,
+  "parameter_condition_token": false,
+  "physics_prior": false,
+  "pde_loss": false,
+
+  "training_protocol": {
+    "prediction": "normalized_delta",
+    "rollout_steps": 4,
+    "rollout_weights": [1.0, 0.8, 0.6, 0.4],
+    "loss": "FieldWiseRelativeL2Loss_on_predicted_normalized_state",
+    "warm_start": "M6-FieldWiseEncoder-H4"
+  },
+
+  "temperature_calibration": {
+    "data": "fixed_training_batches_only",
+    "splits_checked": [
+      "unseen_pr",
+      "unseen_ra"
+    ],
+    "selected_temperature": 0.03,
+    "selection_reason": "state variation visible without near-one-hot saturation"
+  },
+
+  "lambda_calibration": {
+    "data": "fixed_unseen_pr_and_unseen_ra_training_batches_only",
+    "num_batches_per_split": 8,
+    "batch_size": 4,
+    "paired_seeds": [
+      20260717,
+      20260718,
+      20260719
+    ],
+    "anchor": "pooled_static_softmax_scale1_branch_rms_to_pooled_m7_branch_rms",
+    "pooled_m7_branch_rms": 0.000135145905,
+    "pooled_static_scale1_branch_rms": 0.00238133179,
+    "pooled_dynamic_scale1_branch_rms": 0.00320029261,
+    "shared_lambda": 0.05675224,
+    "static_to_m7_after_shared_lambda": 1.0,
+    "dynamic_to_m7_after_shared_lambda": 1.343909
+  },
+
+  "required_dynamic_diagnostics": [
+    "normal_attention_evaluation",
+    "cyclic_shuffle_attention_evaluation",
+    "training_mean_attention_evaluation",
+    "attention_sample_std",
+    "normalized_attention_entropy",
+    "rollout_attention_drift",
+    "residual_gate_values"
+  ]
+}

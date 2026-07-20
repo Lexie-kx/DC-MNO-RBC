@@ -873,7 +873,7 @@ def print_compact_summary(
     print()
     print("=" * 118)
     print(
-        "M9-0 UNSEEN PR FULL FIELD-WISE "
+        "M9-0 CROSS-PARAMETER FULL FIELD-WISE "
         "REL-L2 (%)"
     )
     print("=" * 118)
@@ -904,7 +904,7 @@ def print_compact_summary(
 
     print()
     print("=" * 100)
-    print("M9-0 UNSEEN PR GLOBAL REL-L2 (%)")
+    print("M9-0 CROSS-PARAMETER GLOBAL REL-L2 (%)")
     print("=" * 100)
 
     print(

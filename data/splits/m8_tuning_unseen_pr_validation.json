@@ -1,0 +1,41 @@
+{
+    "split_type": "m8_tuning_unseen_pr_validation",
+    "test": [
+        {
+            "group": "ra_1e6_pr_0.5",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e6_pr_1",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_0.5",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e7_pr_1",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_0.5",
+            "trajectories": [
+                8
+            ]
+        },
+        {
+            "group": "ra_1e8_pr_1",
+            "trajectories": [
+                8
+            ]
+        }
+    ]
+}

@@ -1,6 +1,8 @@
 import os
 import sys
 import json
+import math
+import subprocess
 import time
 import argparse
 
@@ -175,6 +177,25 @@ def parse_args():
         "--lr",
         type=float,
         default=3e-4,
+        help="Base learning rate eta0.",
+    )
+
+    parser.add_argument(
+        "--backbone_lr_mult",
+        type=float,
+        default=1.0,
+    )
+
+    parser.add_argument(
+        "--new_common_lr_mult",
+        type=float,
+        default=1.0,
+    )
+
+    parser.add_argument(
+        "--dynamic_lr_mult",
+        type=float,
+        default=1.0,
     )
 
     parser.add_argument(
@@ -190,6 +211,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--scheduler_t_max",
+        type=int,
+        default=20,
+        help="Cosine scheduler cycle length, independent of epochs.",
+    )
+
+    parser.add_argument(
         "--rollout_steps",
         type=int,
         default=4,
@@ -197,10 +225,27 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--rollout_weights",
+        type=str,
+        default="1.0,0.8,0.6,0.4",
+        help=(
+            "Comma-separated multi-step loss weights. "
+            "The number of values must equal rollout_steps."
+        ),
+    )
+
+    parser.add_argument(
         "--token_hidden_dim",
         type=int,
         default=64,
         help="Hidden dimension of ParameterToken MLP."
+    )
+
+    parser.add_argument(
+        "--alpha_token",
+        type=float,
+        default=1.0,
+        help="Scale applied to ParameterToken before FNO-block injection.",
     )
 
     parser.add_argument(
@@ -271,18 +316,225 @@ def resolve_path(project_root, path):
     return os.path.abspath(os.path.join(project_root, path))
 
 
-def make_rollout_weights(rollout_steps):
-    """
-    H4 default weights:
-        t+1: 1.0
-        t+2: 0.8
-        t+3: 0.6
-        t+4: 0.4
-    """
-    if rollout_steps == 4:
-        return torch.tensor([1.0, 0.8, 0.6, 0.4], dtype=torch.float32)
+def make_rollout_weights(
+    rollout_steps,
+    rollout_weights_text=None,
+):
+    """Build and validate multi-step loss weights."""
+    if rollout_weights_text is None:
+        if rollout_steps == 4:
+            values = [1.0, 0.8, 0.6, 0.4]
+        else:
+            values = torch.linspace(
+                1.0,
+                0.4,
+                steps=rollout_steps,
+                dtype=torch.float32,
+            ).tolist()
+    else:
+        values = [
+            float(value.strip())
+            for value in rollout_weights_text.split(",")
+            if value.strip()
+        ]
 
-    return torch.linspace(1.0, 0.4, steps=rollout_steps, dtype=torch.float32)
+    if len(values) != rollout_steps:
+        raise ValueError(
+            "rollout_weights 数量必须等于 rollout_steps："
+            f"得到 {len(values)} 个权重，"
+            f"rollout_steps={rollout_steps}"
+        )
+
+    if any(
+        (not math.isfinite(value)) or value <= 0
+        for value in values
+    ):
+        raise ValueError(
+            f"rollout_weights 必须全部为有限正数，得到 {values}"
+        )
+
+    return torch.tensor(values, dtype=torch.float32)
+
+
+def _name_matches_prefixes(name, prefixes):
+    return any(
+        name == prefix or name.startswith(prefix + ".")
+        for prefix in prefixes
+    )
+
+
+def build_optimizer_param_groups(
+    model,
+    base_lr,
+    weight_decay,
+    backbone_lr_mult,
+    new_common_lr_mult,
+    dynamic_lr_mult,
+    coupling_mode,
+):
+    backbone_prefixes = (
+        "field_encoders",
+        "fusion",
+        "conv0",
+        "conv1",
+        "conv2",
+        "conv3",
+        "w0",
+        "w1",
+        "w2",
+        "w3",
+        "mlp0",
+        "mlp1",
+    )
+
+    new_common_prefixes = (
+        "param_token",
+        "field_coupling.norm",
+        "field_coupling.pre_proj",
+        "field_coupling.post_proj",
+        "field_coupling.coupling_matrix",
+        "field_coupling.residual_gate",
+    )
+
+    dynamic_prefix = "field_coupling.param_conditioner"
+
+    grouped_params = {
+        "backbone": [],
+        "new_common": [],
+        "dynamic_only": [],
+    }
+    grouped_names = {
+        "backbone": [],
+        "new_common": [],
+        "dynamic_only": [],
+    }
+
+    frozen_dynamic_names = []
+    unmatched = []
+    multi_matched = []
+
+    for name, param in model.named_parameters():
+        if coupling_mode == "static" and (
+            name == dynamic_prefix or name.startswith(dynamic_prefix + ".")
+        ):
+            param.requires_grad_(False)
+            frozen_dynamic_names.append(name)
+            continue
+
+        if not param.requires_grad:
+            continue
+
+        matched_groups = []
+
+        if _name_matches_prefixes(name, backbone_prefixes):
+            matched_groups.append("backbone")
+
+        if _name_matches_prefixes(name, new_common_prefixes):
+            matched_groups.append("new_common")
+
+        if name == dynamic_prefix or name.startswith(dynamic_prefix + "."):
+            matched_groups.append("dynamic_only")
+
+        if len(matched_groups) == 0:
+            unmatched.append(name)
+            continue
+
+        if len(matched_groups) > 1:
+            multi_matched.append((name, matched_groups))
+            continue
+
+        group_name = matched_groups[0]
+        grouped_params[group_name].append(param)
+        grouped_names[group_name].append(name)
+
+    if unmatched:
+        raise RuntimeError(
+            "❌ 以下参数没有被分到任何 optimizer group:\n"
+            + "\n".join(unmatched)
+        )
+
+    if multi_matched:
+        raise RuntimeError(
+            "❌ 以下参数被分到了多个 optimizer group:\n"
+            + "\n".join(
+                [f"{name}: {groups}" for name, groups in multi_matched]
+            )
+        )
+
+    lr_mult_map = {
+        "backbone": backbone_lr_mult,
+        "new_common": new_common_lr_mult,
+        "dynamic_only": dynamic_lr_mult,
+    }
+
+    active_groups = ["backbone", "new_common"]
+    if coupling_mode == "parameter_conditioned":
+        active_groups.append("dynamic_only")
+
+    optimizer_param_groups = []
+    summary = {}
+
+    for group_name in active_groups:
+        params = grouped_params[group_name]
+        if len(params) == 0:
+            raise RuntimeError(
+                f"❌ optimizer group 为空：{group_name}"
+            )
+
+        group_lr = base_lr * lr_mult_map[group_name]
+
+        optimizer_param_groups.append(
+            {
+                "name": group_name,
+                "params": params,
+                "lr": group_lr,
+                "weight_decay": weight_decay,
+                "initial_lr": group_lr,
+            }
+        )
+
+        summary[group_name] = {
+            "num_tensors": len(params),
+            "num_params": sum(p.numel() for p in params),
+            "lr": group_lr,
+            "names": grouped_names[group_name],
+        }
+
+    return optimizer_param_groups, summary, frozen_dynamic_names
+
+
+def make_shared_cosine_scheduler(
+    optimizer,
+    base_lr,
+    eta_min,
+    t_max,
+):
+    if base_lr <= 0:
+        raise ValueError(f"base_lr 必须大于 0，得到 {base_lr}")
+
+    if eta_min < 0:
+        raise ValueError(f"eta_min 不能小于 0，得到 {eta_min}")
+
+    if eta_min > base_lr:
+        raise ValueError(
+            f"eta_min 不能大于 base_lr：eta_min={eta_min}, base_lr={base_lr}"
+        )
+
+    if t_max <= 0:
+        raise ValueError(f"t_max 必须大于 0，得到 {t_max}")
+
+    min_ratio = eta_min / base_lr
+
+    def lr_lambda(epoch):
+        progress = min(max(epoch, 0), t_max) / float(t_max)
+        return min_ratio + 0.5 * (1.0 - min_ratio) * (
+            1.0 + math.cos(math.pi * progress)
+        )
+
+    return optim.lr_scheduler.LambdaLR(
+        optimizer,
+        lr_lambda=lr_lambda,
+    )
 
 
 def autoregressive_multistep_loss(
@@ -423,6 +675,34 @@ def summarize_m8_modules(model, param_probe):
     }
 
 
+
+def get_git_commit(project_root):
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=project_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+    except Exception as error:
+        print(f"⚠️ 无法读取 Git commit: {error}")
+        return "unknown"
+
+
+def make_fixed_param_probe():
+    return torch.tensor(
+        [
+            [6.0, -0.3010299956639812],
+            [6.0,  0.0],
+            [7.0, -0.3010299956639812],
+            [7.0,  0.0],
+        ],
+        dtype=torch.float32,
+    )
+
+
 def main():
     args = parse_args()
 
@@ -432,12 +712,17 @@ def main():
 
     BATCH_SIZE = args.batch_size
     LEARNING_RATE = args.lr
+    BACKBONE_LR_MULT = args.backbone_lr_mult
+    NEW_COMMON_LR_MULT = args.new_common_lr_mult
+    DYNAMIC_LR_MULT = args.dynamic_lr_mult
     EPOCHS = args.epochs
     WEIGHT_DECAY = args.weight_decay
     ETA_MIN = args.eta_min
+    SCHEDULER_T_MAX = args.scheduler_t_max
     RUN_NAME = args.run_name
     ROLLOUT_STEPS = args.rollout_steps
     TOKEN_HIDDEN_DIM = args.token_hidden_dim
+    ALPHA_TOKEN = args.alpha_token
     COUPLING_MODE = args.coupling_mode
     COUPLING_PARAM_HIDDEN_DIM = args.coupling_param_hidden_dim
     COUPLING_CONDITION_SCALE = args.coupling_condition_scale
@@ -462,6 +747,34 @@ def main():
     loader_generator = torch.Generator()
     loader_generator.manual_seed(SEED)
 
+    rollout_weights_cpu = make_rollout_weights(
+        ROLLOUT_STEPS,
+        args.rollout_weights,
+    )
+
+    lr_multipliers = {
+        "backbone": BACKBONE_LR_MULT,
+        "new_common": NEW_COMMON_LR_MULT,
+        "dynamic_only": DYNAMIC_LR_MULT,
+    }
+
+    if any(value <= 0 for value in lr_multipliers.values()):
+        raise ValueError(
+            f"学习率倍率必须全部大于 0，得到 {lr_multipliers}"
+        )
+
+    if SCHEDULER_T_MAX <= 0:
+        raise ValueError(
+            f"scheduler_t_max 必须大于 0，得到 {SCHEDULER_T_MAX}"
+        )
+
+    if ALPHA_TOKEN < 0:
+        raise ValueError(
+            f"alpha_token 必须非负，得到 {ALPHA_TOKEN}"
+        )
+
+    # 分组 optimizer 已接入；倍率参数现在可以安全生效。
+
     if ROLLOUT_STEPS != 4:
         print(f"⚠️ Script name is train_m8_full_conditioned_h4.py, but rollout_steps={ROLLOUT_STEPS}")
 
@@ -472,6 +785,8 @@ def main():
 
     os.makedirs(CKPT_DIR, exist_ok=True)
     os.makedirs(os.path.join(project_root, "outputs", "logs"), exist_ok=True)
+
+    GIT_COMMIT = get_git_commit(project_root)
 
     BEST_SAVE_PATH = os.path.join(CKPT_DIR, f"{RUN_NAME}_best.pth")
 
@@ -493,12 +808,17 @@ def main():
     print("👉 Training type: H4 autoregressive multi-step")
     print("👉 No PDE loss")
     print(f"👉 Rollout train steps: {ROLLOUT_STEPS}")
+    print(f"👉 Rollout weights: {rollout_weights_cpu.tolist()}")
+    print(f"👉 Alpha token: {ALPHA_TOKEN}")
+    print(f"👉 Scheduler T_max: {SCHEDULER_T_MAX}")
+    print(f"👉 LR multipliers: {lr_multipliers}")
     print(f"👉 Random seed: {SEED}")
     print(f"📌 Split: {SPLIT_PATH}")
     print(f"📌 Stats: {STATS_PATH}")
     print(f"📌 Run name: {RUN_NAME}")
     print(f"📌 Init checkpoint: {INIT_CKPT}")
     print(f"📌 Best checkpoint: {BEST_SAVE_PATH}")
+    print(f"📌 Git commit: {GIT_COMMIT}")
 
     if INIT_CKPT is None:
         print(
@@ -554,6 +874,7 @@ def main():
                 "[log10(Ra), log10(Pr)]"
             ),
             "token_hidden_dim": TOKEN_HIDDEN_DIM,
+            "alpha_token": ALPHA_TOKEN,
 
             "prediction_type": "delta",
             "training_type": "H4 autoregressive",
@@ -570,15 +891,17 @@ def main():
 
             "rollout_steps": ROLLOUT_STEPS,
             "rollout_weights": (
-                make_rollout_weights(
-                    ROLLOUT_STEPS
-                ).tolist()
+                rollout_weights_cpu.tolist()
             ),
             "epochs": EPOCHS,
             "batch_size": BATCH_SIZE,
             "learning_rate": LEARNING_RATE,
+            "backbone_lr_mult": BACKBONE_LR_MULT,
+            "new_common_lr_mult": NEW_COMMON_LR_MULT,
+            "dynamic_lr_mult": DYNAMIC_LR_MULT,
             "weight_decay": WEIGHT_DECAY,
             "eta_min": ETA_MIN,
+            "scheduler_t_max": SCHEDULER_T_MAX,
             "seed": SEED,
 
             "split": SPLIT_PATH,
@@ -643,7 +966,14 @@ def main():
     print(f"👉 Y_seq mean:   {sample_y_seq.mean().item():.6f}")
     print(f"👉 Y_seq std:    {sample_y_seq.std().item():.6f}")
 
-    param_probe = sample_param[: min(4, sample_param.shape[0])].clone()
+    param_probe = make_fixed_param_probe()
+
+    print("📌 Fixed param_probe:")
+    for probe_index, probe_value in enumerate(param_probe.tolist()):
+        print(
+            f"   probe[{probe_index}] = "
+            f"[log10(Ra), log10(Pr)] = {probe_value}"
+        )
 
     model = M8FullConditionedFNO2d(
         in_channels=16,
@@ -661,6 +991,7 @@ def main():
         coupling_param_hidden_dim=COUPLING_PARAM_HIDDEN_DIM,
         coupling_condition_scale=COUPLING_CONDITION_SCALE,
         token_hidden_dim=TOKEN_HIDDEN_DIM,
+        alpha_token=ALPHA_TOKEN,
     ).to(DEVICE)
 
     if INIT_CKPT is not None:
@@ -792,21 +1123,46 @@ def main():
 
     criterion = FieldWiseRelativeL2Loss()
 
-    optimizer = optim.AdamW(
-        model.parameters(),
-        lr=LEARNING_RATE,
-        weight_decay=WEIGHT_DECAY
+    optimizer_param_groups, optimizer_group_summary, frozen_dynamic_names = (
+        build_optimizer_param_groups(
+            model=model,
+            base_lr=LEARNING_RATE,
+            weight_decay=WEIGHT_DECAY,
+            backbone_lr_mult=BACKBONE_LR_MULT,
+            new_common_lr_mult=NEW_COMMON_LR_MULT,
+            dynamic_lr_mult=DYNAMIC_LR_MULT,
+            coupling_mode=COUPLING_MODE,
+        )
     )
 
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-        optimizer,
-        T_max=EPOCHS,
-        eta_min=ETA_MIN
+    if frozen_dynamic_names:
+        print(
+            "🧊 Static 模式已冻结 dynamic-only 参数张量数: "
+            f"{len(frozen_dynamic_names)}"
+        )
+
+    print("🧩 Optimizer parameter groups:")
+    for group_name, info in optimizer_group_summary.items():
+        print(
+            f"   {group_name}: "
+            f"tensors={info['num_tensors']} | "
+            f"params={info['num_params']:,} | "
+            f"lr={info['lr']:.2e}"
+        )
+
+    optimizer = optim.AdamW(optimizer_param_groups)
+
+    scheduler = make_shared_cosine_scheduler(
+        optimizer=optimizer,
+        base_lr=LEARNING_RATE,
+        eta_min=ETA_MIN,
+        t_max=SCHEDULER_T_MAX,
     )
 
-    rollout_weights = make_rollout_weights(ROLLOUT_STEPS).to(DEVICE)
+    rollout_weights = rollout_weights_cpu.to(DEVICE)
 
-    best_val_loss = float('inf')
+    best_val_loss = float("inf")
+    top3_checkpoints = []
     start_time = time.time()
 
     print(
@@ -904,7 +1260,16 @@ def main():
         val_loss = val_loss / max(num_val, 1)
         val_step_losses = val_step_loss_sum / max(num_val, 1)
 
-        current_lr = optimizer.param_groups[0]['lr']
+        current_lr_dict = {
+            group.get("name", f"group_{idx}"): group["lr"]
+            for idx, group in enumerate(optimizer.param_groups)
+        }
+        lr_msg = " | ".join(
+            [
+                f"{name} LR: {lr:.2e}"
+                for name, lr in current_lr_dict.items()
+            ]
+        )
         current_best = min(best_val_loss, val_loss)
         m8_summary = summarize_m8_modules(
             model,
@@ -927,7 +1292,7 @@ def main():
             f"{m8_summary['coupling_gate_mean']:.5f} | "
             f"CondDeltaAbsMax: "
             f"{m8_summary['conditioned_delta_abs_max']:.6f} | "
-            f"LR: {current_lr:.2e}"
+            f"{lr_msg}"
         )
 
         log_dict = {
@@ -935,7 +1300,9 @@ def main():
             "Train MultiStep Rel-L2": train_loss,
             "Val MultiStep Rel-L2": val_loss,
             "Grad Norm": avg_grad_norm,
-            "Learning Rate": current_lr,
+            "Learning Rate / backbone": current_lr_dict.get("backbone", float("nan")),
+            "Learning Rate / new_common": current_lr_dict.get("new_common", float("nan")),
+            "Learning Rate / dynamic_only": current_lr_dict.get("dynamic_only", float("nan")),
             "Best Val MultiStep Rel-L2": current_best,
             "ParameterToken abs mean": (
                 m8_summary["token_abs_mean"]
@@ -976,7 +1343,60 @@ def main():
 
         wandb.log(log_dict)
 
+        model_config = {
+            "in_channels": 16,
+            "out_channels": 4,
+            "modes1": 16,
+            "modes2": 16,
+            "width": 32,
+            "context_length": 4,
+            "num_fields": 4,
+            "field_width": None,
+            "coupling_mode": COUPLING_MODE,
+            "coupling_hidden_channels": 8,
+            "coupling_dropout": 0.0,
+            "coupling_init_gate": COUPLING_INIT_GATE,
+            "coupling_use_norm": True,
+            "coupling_param_hidden_dim": COUPLING_PARAM_HIDDEN_DIM,
+            "coupling_condition_scale": COUPLING_CONDITION_SCALE,
+            "token_hidden_dim": TOKEN_HIDDEN_DIM,
+            "alpha_token": ALPHA_TOKEN,
+        }
+
+        train_config = {
+            "epochs": EPOCHS,
+            "batch_size": BATCH_SIZE,
+            "base_lr": LEARNING_RATE,
+            "backbone_lr_mult": BACKBONE_LR_MULT,
+            "new_common_lr_mult": NEW_COMMON_LR_MULT,
+            "dynamic_lr_mult": DYNAMIC_LR_MULT,
+            "weight_decay": WEIGHT_DECAY,
+            "eta_min": ETA_MIN,
+            "scheduler_type": "shared_cosine_multiplier",
+            "scheduler_t_max": SCHEDULER_T_MAX,
+            "rollout_steps": ROLLOUT_STEPS,
+            "rollout_weights": rollout_weights.detach().cpu().tolist(),
+            "seed": SEED,
+            "grad_clip": 1.0,
+        }
+
+        data_config = {
+            "split_path": SPLIT_PATH,
+            "stats_path": STATS_PATH,
+            "train_key": "train",
+            "validation_key": "val",
+            "context_length": 4,
+            "field_order": [
+                "buoyancy",
+                "u_x",
+                "u_y",
+                "pressure",
+            ],
+            "init_ckpt": INIT_CKPT,
+        }
+
         checkpoint_payload = {
+            "checkpoint_format_version": 2,
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": (
@@ -985,6 +1405,10 @@ def main():
             "scheduler_state_dict": (
                 scheduler.state_dict()
             ),
+            "model_config": model_config,
+            "train_config": train_config,
+            "data_config": data_config,
+            "git_commit": GIT_COMMIT,
             "val_loss": val_loss,
             "best_val_loss": best_val_loss,
 
@@ -1016,6 +1440,7 @@ def main():
                     "additive_token_per_fno_block"
                 ),
                 "token_hidden_dim": TOKEN_HIDDEN_DIM,
+                "alpha_token": ALPHA_TOKEN,
                 "num_layers": 4,
                 "token_abs_mean": (
                     m8_summary["token_abs_mean"]
@@ -1082,12 +1507,18 @@ def main():
                 initial_mode_mean_diff
             ),
 
+            "group_learning_rates": current_lr_dict,
+
             "training_protocol": {
                 "epochs": EPOCHS,
                 "batch_size": BATCH_SIZE,
                 "learning_rate": LEARNING_RATE,
+                "backbone_lr_mult": BACKBONE_LR_MULT,
+                "new_common_lr_mult": NEW_COMMON_LR_MULT,
+                "dynamic_lr_mult": DYNAMIC_LR_MULT,
                 "weight_decay": WEIGHT_DECAY,
                 "eta_min": ETA_MIN,
+                "scheduler_t_max": SCHEDULER_T_MAX,
                 "grad_clip": 1.0,
                 "max_train_batches": (
                     args.max_train_batches
@@ -1098,6 +1529,69 @@ def main():
             },
         }
 
+        # 所有本轮保存文件都记录更新后的历史最优 validation loss。
+        checkpoint_payload["best_val_loss"] = min(
+            best_val_loss,
+            val_loss,
+        )
+
+        # H4 validation loss Top-3 候选池。
+        qualifies_for_top3 = (
+            len(top3_checkpoints) < 3
+            or val_loss < top3_checkpoints[-1]["val_loss"]
+        )
+
+        if qualifies_for_top3:
+            top3_save_path = os.path.join(
+                CKPT_DIR,
+                f"{RUN_NAME}_valtop_epoch_{epoch:02d}.pth",
+            )
+
+            torch.save(
+                checkpoint_payload,
+                top3_save_path,
+            )
+
+            top3_checkpoints.append(
+                {
+                    "epoch": int(epoch),
+                    "val_loss": float(val_loss),
+                    "path": top3_save_path,
+                }
+            )
+
+            top3_checkpoints.sort(
+                key=lambda item: (
+                    item["val_loss"],
+                    item["epoch"],
+                )
+            )
+
+            while len(top3_checkpoints) > 3:
+                removed = top3_checkpoints.pop()
+
+                if os.path.exists(removed["path"]):
+                    os.remove(removed["path"])
+
+                print(
+                    "   [Top-3 移除] "
+                    f"epoch={removed['epoch']} | "
+                    f"val={removed['val_loss']:.6f}"
+                )
+
+            print("   [Top-3 当前排名]")
+
+            for rank, record in enumerate(
+                top3_checkpoints,
+                start=1,
+            ):
+                print(
+                    f"      #{rank}: "
+                    f"epoch={record['epoch']} | "
+                    f"val={record['val_loss']:.6f}"
+                )
+
+        # 固定周期 checkpoint：epoch 5 / 10 / 15 / 20。
         if epoch % 5 == 0:
             epoch_save_path = os.path.join(
                 CKPT_DIR,
@@ -1106,9 +1600,10 @@ def main():
             torch.save(checkpoint_payload, epoch_save_path)
             print(f"   [*] 保存周期 checkpoint: {epoch_save_path}")
 
+        # 保留原有 best checkpoint，兼容既有训练和评估流程。
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            checkpoint_payload['best_val_loss'] = best_val_loss
+            checkpoint_payload["best_val_loss"] = best_val_loss
             torch.save(checkpoint_payload, BEST_SAVE_PATH)
             print(f"  🌟 [New Best] 权重已保存至: {BEST_SAVE_PATH}")
 
@@ -1119,6 +1614,20 @@ def main():
     print(f"\n✅ {EXPERIMENT_NAME} 训练完成!")
     print(f"📌 Coupling mode: {COUPLING_MODE}")
     print(f"📌 最优模型: {BEST_SAVE_PATH}")
+
+    print("📌 最终 H4 validation Top-3:")
+
+    for rank, record in enumerate(
+        top3_checkpoints,
+        start=1,
+    ):
+        print(
+            f"   #{rank}: "
+            f"epoch={record['epoch']} | "
+            f"val={record['val_loss']:.6f} | "
+            f"path={record['path']}"
+        )
+
     print(f"⏱️ 总耗时: {total_time / 60:.2f} 分钟")
 
     final_summary = summarize_m8_modules(

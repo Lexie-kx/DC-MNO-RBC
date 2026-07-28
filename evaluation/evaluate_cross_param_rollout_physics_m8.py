@@ -416,6 +416,102 @@ def load_checkpoint(
     return model
 
 
+
+def build_m8_model_from_checkpoint(
+    checkpoint_path,
+    device,
+    expected_coupling_mode,
+):
+    checkpoint = torch.load(
+        checkpoint_path,
+        map_location=device,
+    )
+
+    if (
+        isinstance(checkpoint, dict)
+        and "model_state_dict" in checkpoint
+    ):
+        state_dict = checkpoint["model_state_dict"]
+        model_config = checkpoint.get("model_config")
+    else:
+        state_dict = checkpoint
+        model_config = None
+
+    if model_config is None:
+        print(
+            "⚠️ Legacy M8 checkpoint：未发现 model_config，"
+            "使用原始 M8 默认结构恢复。"
+        )
+
+        model_config = {
+            "in_channels": 16,
+            "out_channels": 4,
+            "modes1": 16,
+            "modes2": 16,
+            "width": 32,
+            "context_length": 4,
+            "num_fields": 4,
+            "field_width": None,
+            "coupling_mode": expected_coupling_mode,
+            "coupling_hidden_channels": 8,
+            "coupling_dropout": 0.0,
+            "coupling_init_gate": -4.0,
+            "coupling_use_norm": True,
+            "coupling_param_hidden_dim": 64,
+            "coupling_condition_scale": 0.10,
+            "token_hidden_dim": 64,
+            "alpha_token": 1.0,
+        }
+
+        config_source = "legacy defaults"
+
+    else:
+        model_config = dict(model_config)
+
+        # 兼容早期结构化 checkpoint。
+        model_config.setdefault(
+            "alpha_token",
+            1.0,
+        )
+        model_config.setdefault(
+            "coupling_mode",
+            expected_coupling_mode,
+        )
+
+        config_source = "checkpoint model_config"
+
+    actual_mode = model_config["coupling_mode"]
+
+    if actual_mode != expected_coupling_mode:
+        raise ValueError(
+            "❌ M8 checkpoint coupling_mode 不匹配："
+            f"expected={expected_coupling_mode}, "
+            f"checkpoint={actual_mode}, "
+            f"path={checkpoint_path}"
+        )
+
+    model = M8FullConditionedFNO2d(
+        **model_config
+    ).to(device)
+
+    model.load_state_dict(
+        state_dict,
+        strict=True,
+    )
+    model.eval()
+
+    print(
+        "✅ Restored M8 checkpoint | "
+        f"source={config_source} | "
+        f"mode={model_config['coupling_mode']} | "
+        f"alpha_token={model_config['alpha_token']} | "
+        "condition_scale="
+        f"{model_config['coupling_condition_scale']}"
+    )
+
+    return model
+
+
 @torch.no_grad()
 def rollout_without_param(
     model,
@@ -1051,62 +1147,16 @@ def main():
         device,
     )
 
-    m8_full_static = M8FullConditionedFNO2d(
-        in_channels=(
-            CONTEXT_LENGTH
-            * len(FIELD_ORDER)
-        ),
-        out_channels=len(FIELD_ORDER),
-        modes1=16,
-        modes2=16,
-        width=32,
-        context_length=CONTEXT_LENGTH,
-        num_fields=len(FIELD_ORDER),
-        coupling_mode="static",
-        coupling_hidden_channels=8,
-        coupling_dropout=0.0,
-        coupling_init_gate=-4.0,
-        coupling_use_norm=True,
-        coupling_param_hidden_dim=64,
-        coupling_condition_scale=0.10,
-        token_hidden_dim=64,
-    ).to(device)
-
-    m8_full_static = load_checkpoint(
-        m8_full_static,
-        m8_full_static_checkpoint,
-        device,
+    m8_full_static = build_m8_model_from_checkpoint(
+        checkpoint_path=m8_full_static_checkpoint,
+        device=device,
+        expected_coupling_mode="static",
     )
 
-    m8_param_conditioned = (
-        M8FullConditionedFNO2d(
-            in_channels=(
-                CONTEXT_LENGTH
-                * len(FIELD_ORDER)
-            ),
-            out_channels=len(FIELD_ORDER),
-            modes1=16,
-            modes2=16,
-            width=32,
-            context_length=CONTEXT_LENGTH,
-            num_fields=len(FIELD_ORDER),
-            coupling_mode=(
-                "parameter_conditioned"
-            ),
-            coupling_hidden_channels=8,
-            coupling_dropout=0.0,
-            coupling_init_gate=-4.0,
-            coupling_use_norm=True,
-            coupling_param_hidden_dim=64,
-            coupling_condition_scale=0.10,
-            token_hidden_dim=64,
-        ).to(device)
-    )
-
-    m8_param_conditioned = load_checkpoint(
-        m8_param_conditioned,
-        m8_param_conditioned_checkpoint,
-        device,
+    m8_param_conditioned = build_m8_model_from_checkpoint(
+        checkpoint_path=m8_param_conditioned_checkpoint,
+        device=device,
+        expected_coupling_mode="parameter_conditioned",
     )
 
     accumulator = {

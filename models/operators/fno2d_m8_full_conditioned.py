@@ -94,6 +94,7 @@ class M8FullConditionedFNO2d(nn.Module):
         coupling_param_hidden_dim: int = 64,
         coupling_condition_scale: float = 0.10,
         token_hidden_dim: int = 64,
+        alpha_token: float = 1.0,
     ) -> None:
         super().__init__()
 
@@ -131,6 +132,12 @@ class M8FullConditionedFNO2d(nn.Module):
         self.field_width = field_width
         self.coupling_mode = coupling_mode
         self.token_hidden_dim = token_hidden_dim
+
+        if alpha_token < 0:
+            raise ValueError(
+                f"alpha_token must be non-negative, got {alpha_token}"
+            )
+        self.alpha_token = float(alpha_token)
 
         fused_width = field_width * num_fields
 
@@ -370,7 +377,8 @@ class M8FullConditionedFNO2d(nn.Module):
             coupling_mode=active_mode,
         )
 
-        tokens = self.param_token(param)
+        raw_tokens = self.param_token(param)
+        tokens = self.alpha_token * raw_tokens
 
         # FNO block 0
         x = self.conv0(x) + self.w0(x)
@@ -418,7 +426,9 @@ class M8FullConditionedFNO2d(nn.Module):
                 "coupled_field_features": (
                     coupled_field_features
                 ),
+                "raw_param_tokens": raw_tokens,
                 "param_tokens": tokens,
+                "alpha_token": self.alpha_token,
                 "coupling_gate": coupling_info[
                     "coupling_gate"
                 ],

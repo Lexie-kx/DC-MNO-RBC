@@ -1042,11 +1042,24 @@ def main():
     # The conditioned correction head is zero-initialized,
     # so both modes must initially produce the same output.
     # --------------------------------------------------------
-    probe_context = sample_context[
-        : param_probe.shape[0]
-    ].to(DEVICE)
+    # 使用同一个固定 context 复制到所有参数探针，
+    # 避免诊断 batch size 依赖训练 DataLoader 的 batch_size。
+    probe_context = sample_context[:1].repeat(
+        param_probe.shape[0],
+        1,
+        1,
+        1,
+        1,
+    ).to(DEVICE)
 
     probe_param = param_probe.to(DEVICE)
+
+    if probe_context.shape[0] != probe_param.shape[0]:
+        raise RuntimeError(
+            "probe_context 与 probe_param batch 不一致："
+            f"context={probe_context.shape[0]}, "
+            f"param={probe_param.shape[0]}"
+        )
 
     (
         probe_batch,

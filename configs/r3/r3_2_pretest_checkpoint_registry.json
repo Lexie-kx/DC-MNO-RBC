@@ -1,0 +1,90 @@
+{
+  "stage": "R3-2",
+  "registry_status": "LOCKED_BEFORE_FORMAL_TEST",
+  "purpose": "Freeze all four VAL-selected R3-2 formal best checkpoints before any R3-2 TEST access.",
+  "selection_policy": {
+    "selection_source": "validation_only",
+    "test_used_for_model_selection": false,
+    "test_accessed_during_training": false,
+    "checkpoint_rule": "minimum H4 free-autoregressive validation loss within the locked 20-epoch formal run, with epoch-0 frozen R3-1b parent participating in selection",
+    "post_registry_checkpoint_replacement_forbidden": true,
+    "post_registry_test_driven_model_redesign_forbidden": true
+  },
+  "frozen_code_provenance": {
+    "r3_2_contract_commit": "0594afd",
+    "r3_2_architecture_commit": "d96877d",
+    "r3_2_trainer_commit": "849791b",
+    "r3_2_contract_sha256": "cb364218e812a74fa59ad4b7e303877850d43e142bba65a8ea22023471584efd"
+  },
+  "formal_checkpoints": {
+    "unseen_pr": {
+      "R3-2a": {
+        "role": "ParamOnly matched control",
+        "adaptation_mode": "paramonly",
+        "checkpoint": "checkpoints/r3_2/r3_2a_paramonly_h4_unseen_pr_best.pth",
+        "sha256": "05b34bfed1c002bec215a1b3da5ce4bd15ea23b12acc8252afb3e66ed2720d45",
+        "best_epoch": 10,
+        "best_val_loss": 0.22204328258939113,
+        "trainable_parameter_count": 914,
+        "parent_r3_1b_sha256": "20c535eeef85134f2aed2230218511766fdde866b228f8e6de8352953f393008",
+        "test_accessed": false
+      },
+      "R3-2b": {
+        "role": "StateParam formal candidate",
+        "adaptation_mode": "stateparam",
+        "checkpoint": "checkpoints/r3_2/r3_2b_stateparam_h4_unseen_pr_best.pth",
+        "sha256": "9e5697a214a09c554e91c326047fc75e5b3a8f99e3fee99c48e9e9673b7a067a",
+        "best_epoch": 10,
+        "best_val_loss": 0.22204328837093487,
+        "trainable_parameter_count": 914,
+        "parent_r3_1b_sha256": "20c535eeef85134f2aed2230218511766fdde866b228f8e6de8352953f393008",
+        "test_accessed": false
+      }
+    },
+    "unseen_ra": {
+      "R3-2a": {
+        "role": "ParamOnly matched control",
+        "adaptation_mode": "paramonly",
+        "checkpoint": "checkpoints/r3_2/r3_2a_paramonly_h4_unseen_ra_best.pth",
+        "sha256": "c7eeb2de53cbf0eaef7e25c14ec733f1dce4f9da2d0a4dc66df6214a6ec044fb",
+        "best_epoch": 6,
+        "best_val_loss": 0.1865624729210117,
+        "trainable_parameter_count": 914,
+        "parent_r3_1b_sha256": "d2ea9659aaa3f1687bb63d78cfdcf98a6cae651e485c3d6f58c6193843e1ba8d",
+        "test_accessed": false
+      },
+      "R3-2b": {
+        "role": "StateParam formal candidate",
+        "adaptation_mode": "stateparam",
+        "checkpoint": "checkpoints/r3_2/r3_2b_stateparam_h4_unseen_ra_best.pth",
+        "sha256": "fc64be2ba2b19fa27469c992391a4dcf41133a9a32c965e17b97f15e371c6b39",
+        "best_epoch": 19,
+        "best_val_loss": 0.18654042271409838,
+        "trainable_parameter_count": 914,
+        "parent_r3_1b_sha256": "d2ea9659aaa3f1687bb63d78cfdcf98a6cae651e485c3d6f58c6193843e1ba8d",
+        "test_accessed": false
+      }
+    }
+  },
+  "primary_formal_contrast": {
+    "comparison": "R3-2b - R3-2a",
+    "interpretation": "incremental value of current-state information beyond an exactly capacity-matched parameter-only adaptive conditioner"
+  },
+  "secondary_formal_contrasts": [
+    {
+      "comparison": "R3-2a - R3-1b",
+      "interpretation": "value of parameter-only adaptive coupling relative to fixed canonical coupling"
+    },
+    {
+      "comparison": "R3-2b - R3-1b",
+      "interpretation": "total value of state-plus-parameter adaptive coupling relative to fixed canonical coupling"
+    }
+  ],
+  "formal_test_policy": {
+    "checkpoint_set_fixed_before_test": true,
+    "same_checkpoint_set_required_for_rollout_and_physics": true,
+    "formal_rollout_protocol": "all legal TEST windows, stride 1, free autoregressive H1-H16",
+    "formal_physics_protocol": "matched R3 formal physics evaluator protocol on the same fixed checkpoints",
+    "test_results_may_be_reported_but_may_not_be_used_to_replace_or retrain_these_checkpoints": true
+  }
+}

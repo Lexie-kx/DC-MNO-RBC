@@ -1,11 +1,9 @@
 {
   "stage": "R3-0",
   "role": "architecture_freeze_before_training",
-
   "research_question": {
     "r3_1a_vs_r3_1b": "Does a dimensionally/representation-valid physical interface improve model-level PDE-structured coupling when architecture and training capacity are matched?"
   },
-
   "backbone": {
     "name": "M6-FieldWiseEncoder-H4",
     "class": "FieldWiseFNO2d",
@@ -13,7 +11,6 @@
     "same_checkpoint_between_arms": true,
     "prediction_type": "normalized_finite_step_delta"
   },
-
   "matched_pair": {
     "r3_1a": {
       "name": "Naive normalized-space PDE sparse coupling control",
@@ -25,49 +22,87 @@
       "representation_mode": "canonical",
       "physical_interface": "real_canonical_metadata"
     },
-
     "only_allowed_structural_difference": "physical_representation_interface"
   },
-
   "active_routing": {
     "buoyancy_advection": {
       "semantic_class": "cross_field",
-      "sources": ["buoyancy", "u_x", "u_y"],
-      "targets": ["buoyancy"],
+      "sources": [
+        "buoyancy",
+        "u_x",
+        "u_y"
+      ],
+      "targets": [
+        "buoyancy"
+      ],
       "active": true
     },
-
     "buoyancy_forcing": {
       "semantic_class": "cross_field",
-      "sources": ["buoyancy"],
-      "targets": ["u_y"],
+      "sources": [
+        "buoyancy"
+      ],
+      "targets": [
+        "u_y"
+      ],
       "active": true
     }
   },
-
   "registered_but_inactive": {
     "pressure_gradient": "R4 pressure-specific matched ablation",
     "momentum_advection": "R4 self-dynamics matched ablation",
     "viscosity": "R4 self-dynamics matched ablation",
     "buoyancy_diffusion": "R4 self-dynamics matched ablation"
   },
-
   "constraint_terms": {
     "divergence": {
       "output_injection": false,
       "role": "diagnostic_or_constraint_only"
     }
   },
-
   "correction": {
     "merge_space": "normalized_finite_step_target_delta",
     "phi": "identity",
     "gate_type": "global_learnable_bounded_scalar_per_active_term",
-    "gate_formula": "alpha_j = alpha_max * tanh(raw_alpha_j)",
+    "gate_formula": "alpha_j = alpha_max_by_term[j] * tanh(raw_alpha_j)",
     "raw_gate_initialization": 0.0,
-    "epoch0_output_equals_m6": true
+    "epoch0_output_equals_m6": true,
+    "alpha_upper_bound_policy": {
+      "scope": "fixed_nonlearnable_per_pde_term",
+      "shared_between_r3_1a_and_r3_1b": true,
+      "same_bound_required_across_different_terms": false,
+      "arm_specific_tuning_forbidden": true,
+      "selection_source": "TRAIN-only numerical-safety support audit",
+      "selection_uses_validation_performance": false,
+      "selection_uses_test": false,
+      "formal_values_status": "LOCKED",
+      "formal_alpha_max_by_term": {
+        "buoyancy_advection": 0.021792202037947142,
+        "buoyancy_forcing": 1.2050772196677188e-05
+      },
+      "formal_selection_evidence": {
+        "buoyancy_advection": {
+          "unseen_pr_bound": 0.021792202037947142,
+          "unseen_ra_bound": 0.022133445294514376,
+          "formal_bound": 0.021792202037947142,
+          "limiting_split": "unseen_pr"
+        },
+        "buoyancy_forcing": {
+          "unseen_pr_bound": 3.633518921368108e-05,
+          "unseen_ra_bound": 1.2050772196677188e-05,
+          "formal_bound": 1.2050772196677188e-05,
+          "limiting_split": "unseen_ra"
+        }
+      },
+      "formal_selection_rule": "for each term j: min(alpha_bound_unseen_pr[j], alpha_bound_unseen_ra[j])",
+      "formal_audit_files": {
+        "unseen_pr": "outputs/tables/r3_1_alpha_support_unseen_pr_formal_metadata.json",
+        "unseen_ra": "outputs/tables/r3_1_alpha_support_unseen_ra_formal_metadata.json"
+      },
+      "safety_target_fraction": 0.5,
+      "candidate_ceiling": 0.25
+    }
   },
-
   "disabled_in_r3_1": {
     "stateparam": true,
     "utility_gate": true,
@@ -77,10 +112,22 @@
     "learnable_spatial_phi": true,
     "legacy_m10_path_a": true
   },
-
   "future_stages": {
     "R3-2": "state-adaptive canonical coupling",
     "R3-3": "state-selective utility mechanism",
     "R4": "topology/PDE-semantics/self-dynamics/pressure matched ablations"
+  },
+  "r3_0c_amendment": {
+    "reason": "TRAIN-only debug support audit showed that active PDE terms have strongly different natural scales and target fields; a single cross-term alpha_max would allow the largest-scale term to collapse the usable capacity of the other term.",
+    "change": "Replace one cross-term alpha_max with one fixed alpha_max_by_term[j] per active PDE term.",
+    "matched_pair_requirement": "For every term j, R3-1a and R3-1b must use exactly the same alpha_max_by_term[j].",
+    "trainable_parameter_count_changed": false,
+    "trainable_parameter_count": 2,
+    "representation_interface_changed": false,
+    "active_routing_changed": false,
+    "stateparam_added": false,
+    "utility_added": false,
+    "rmscap_added": false,
+    "pde_loss_added": false
   }
 }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,27 @@ CONTRACT_PATH = (
 )
 
 
+# ============================================================
+# R3-0C test-only capacity values
+#
+# IMPORTANT:
+# These are NOT the final formal R3-1 alpha bounds.
+#
+# We deliberately make them different across PDE terms to prove:
+#
+#     alpha_max_advection != alpha_max_forcing
+#
+# is structurally allowed,
+#
+# while Naive / Canonical MUST receive the exact same dictionary.
+# ============================================================
+
+TEST_ALPHA_MAX_BY_TERM = {
+    "buoyancy_advection": 0.25,
+    "buoyancy_forcing": 0.01,
+}
+
+
 @pytest.fixture(scope="module")
 def matched_pair():
     metadata = build_rbc_canonical_metadata(
@@ -42,14 +64,18 @@ def matched_pair():
     canonical = R3PDECouplingFNO2d(
         canonical_metadata=metadata,
         representation_mode="canonical",
-        alpha_max=0.25,
+        alpha_max_by_term=(
+            TEST_ALPHA_MAX_BY_TERM
+        ),
         freeze_m6=True,
     )
 
     naive = R3PDECouplingFNO2d(
         canonical_metadata=metadata,
         representation_mode="naive",
-        alpha_max=0.25,
+        alpha_max_by_term=(
+            TEST_ALPHA_MAX_BY_TERM
+        ),
         freeze_m6=True,
     )
 
@@ -180,11 +206,10 @@ def test_r3_matched_parameter_topology(
     )
 
     # --------------------------------------------------------
-    # Entire learnable state topology must have identical
-    # keys, tensor shapes and initialization.
+    # Entire learnable state topology must be identical.
     #
-    # Representation metadata is intentionally NOT a
-    # learnable state_dict quantity.
+    # alpha_max_by_term is intentionally NOT learnable and is
+    # therefore not required to appear in state_dict.
     # --------------------------------------------------------
 
     naive_state = naive.state_dict()
@@ -197,6 +222,7 @@ def test_r3_matched_parameter_topology(
     )
 
     for key in naive_state:
+
         assert (
             naive_state[key].shape
             ==
@@ -209,6 +235,143 @@ def test_r3_matched_parameter_topology(
             rtol=0.0,
             atol=0.0,
         )
+
+
+def test_r3_per_term_capacity_is_matched_between_arms(
+    matched_pair,
+):
+    _, naive, canonical = matched_pair
+
+    # --------------------------------------------------------
+    # Core R3-0C requirement:
+    #
+    # Different PDE terms MAY have different fixed upper bounds,
+    # but Naive and Canonical MUST have exactly the same bound
+    # for each corresponding term.
+    # --------------------------------------------------------
+
+    assert (
+        naive.alpha_max_by_term
+        ==
+        canonical.alpha_max_by_term
+    )
+
+    assert (
+        naive.alpha_max_by_term
+        ==
+        TEST_ALPHA_MAX_BY_TERM
+    )
+
+    # Prove per-term bounds are allowed to differ.
+    assert (
+        naive.alpha_max_for_term(
+            "buoyancy_advection"
+        )
+        !=
+        naive.alpha_max_for_term(
+            "buoyancy_forcing"
+        )
+    )
+
+    for term_name in (
+        R3PDECouplingFNO2d.ACTIVE_TERMS
+    ):
+
+        assert (
+            naive.alpha_max_for_term(
+                term_name
+            )
+            ==
+            canonical.alpha_max_for_term(
+                term_name
+            )
+        )
+
+
+def test_r3_gate_formula_uses_correct_per_term_bound(
+    matched_pair,
+):
+    _, naive, canonical = matched_pair
+
+    # --------------------------------------------------------
+    # Set the SAME raw gate value in both arms.
+    #
+    # Then:
+    #
+    # alpha_j =
+    #     alpha_max_by_term[j] * tanh(raw_alpha_j)
+    #
+    # must hold exactly up to floating-point tolerance.
+    # --------------------------------------------------------
+
+    raw_value = 0.7
+
+    with torch.no_grad():
+
+        for model in (
+            naive,
+            canonical,
+        ):
+
+            for term_name in (
+                model.ACTIVE_TERMS
+            ):
+
+                model.raw_alpha[
+                    term_name
+                ].fill_(
+                    raw_value
+                )
+
+    for model in (
+        naive,
+        canonical,
+    ):
+
+        for term_name in (
+            model.ACTIVE_TERMS
+        ):
+
+            expected = (
+                model.alpha_max_for_term(
+                    term_name
+                )
+                *
+                math.tanh(
+                    raw_value
+                )
+            )
+
+            actual = float(
+                model.gate_value(
+                    term_name
+                )
+                .detach()
+                .cpu()
+            )
+
+            assert math.isclose(
+                actual,
+                expected,
+                rel_tol=1.0e-6,
+                abs_tol=1.0e-7,
+            )
+
+    # Restore epoch-0 initialization for later tests.
+    with torch.no_grad():
+
+        for model in (
+            naive,
+            canonical,
+        ):
+
+            for term_name in (
+                model.ACTIVE_TERMS
+            ):
+
+                model.raw_alpha[
+                    term_name
+                ].zero_()
 
 
 def test_r3_only_representation_metadata_differs(
@@ -271,20 +434,29 @@ def test_r3_only_representation_metadata_differs(
     for field in metadata.field_order:
 
         mean_diff = abs(
-            metadata.normalization.mean_for(field)
+            metadata.normalization.mean_for(
+                field
+            )
             -
-            naive_meta.normalization.mean_for(field)
+            naive_meta.normalization.mean_for(
+                field
+            )
         )
 
         std_diff = abs(
-            metadata.normalization.std_for(field)
+            metadata.normalization.std_for(
+                field
+            )
             -
-            naive_meta.normalization.std_for(field)
+            naive_meta.normalization.std_for(
+                field
+            )
         )
 
         if (
             mean_diff > 1.0e-8
-            or std_diff > 1.0e-8
+            or
+            std_diff > 1.0e-8
         ):
             normalization_diff_found = True
 
@@ -297,6 +469,22 @@ def test_r3_epoch0_both_arms_equal_same_m6(
     metadata, naive, canonical = (
         matched_pair
     )
+
+    # Explicitly restore exact epoch-0 gate state.
+    with torch.no_grad():
+
+        for model in (
+            naive,
+            canonical,
+        ):
+
+            for term_name in (
+                model.ACTIVE_TERMS
+            ):
+
+                model.raw_alpha[
+                    term_name
+                ].zero_()
 
     x_norm = make_input(metadata)
 
@@ -338,7 +526,9 @@ def test_r3_epoch0_both_arms_equal_same_m6(
 
     assert float(
         (
-            naive_out - canonical_out
+            naive_out
+            -
+            canonical_out
         ).abs().max()
     ) <= 1.0e-7
 
@@ -371,6 +561,19 @@ def test_r3_epoch0_both_arms_equal_same_m6(
                 "gate_values"
             ][term_name]
         ) == 0.0
+
+    # Both arms must also expose the same fixed capacity map.
+    assert (
+        naive_comp[
+            "alpha_max_by_term"
+        ]
+        ==
+        canonical_comp[
+            "alpha_max_by_term"
+        ]
+        ==
+        TEST_ALPHA_MAX_BY_TERM
+    )
 
 
 def test_r3_representation_switch_changes_only_pde_signal(
@@ -439,7 +642,7 @@ def test_r3_representation_switch_changes_only_pde_signal(
         if max_diff > 1.0e-7:
             difference_found = True
 
-    # The architecture is identical, but the physical
-    # representation interface must actually have an
-    # observable effect on the compiled PDE signal.
+    # Architecture/capacity is matched, but the physical
+    # representation interface must actually change the
+    # compiled PDE signal.
     assert difference_found

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
+import math
+from typing import Dict, Mapping, Optional
 
 import torch
 import torch.nn as nn
@@ -24,9 +25,9 @@ class R3PDECouplingFNO2d(nn.Module):
     """
     R3-1 shared matched architecture.
 
-    ------------------------------------------------------------
+    ============================================================
     Purpose
-    ------------------------------------------------------------
+    ============================================================
 
     Build ONE common architecture for:
 
@@ -36,17 +37,17 @@ class R3PDECouplingFNO2d(nn.Module):
         R3-1b:
             canonical dimension-valid PDE sparse coupling
 
-    The ONLY intended structural difference is:
+    The ONLY intended experimental difference is:
 
         representation_mode = "naive"
             -> identity normalization metadata
-            -> normalized numerical values are interpreted directly
-               as canonical physical values
+            -> normalized numerical values are interpreted
+               directly as canonical physical values
 
         representation_mode = "canonical"
             -> real canonical metadata
-            -> normalized history is restored to canonical RBC space
-               before PDE evaluation
+            -> normalized history is restored to canonical
+               RBC space before PDE evaluation
 
     Everything else is shared:
 
@@ -59,11 +60,12 @@ class R3PDECouplingFNO2d(nn.Module):
         - same number of gates
         - same gate parameterization
         - same zero initialization
+        - same per-term alpha upper bounds
         - same output-delta merge rule
 
-    ------------------------------------------------------------
-    R3-1 ACTIVE physical paths
-    ------------------------------------------------------------
+    ============================================================
+    R3-1 active physical paths
+    ============================================================
 
     1. buoyancy_advection
            -u · grad(b)
@@ -73,9 +75,42 @@ class R3PDECouplingFNO2d(nn.Module):
            b
            -> u_y normalized finite-step delta
 
-    ------------------------------------------------------------
+    ============================================================
+    R3-0C capacity amendment
+    ============================================================
+
+    Different PDE operators naturally have different numerical
+    scales and different target fields.
+
+    Therefore R3-1 uses:
+
+        alpha_j =
+            alpha_max_by_term[j]
+            * tanh(raw_alpha_j)
+
+    instead of forcing one shared scalar alpha_max across all
+    PDE terms.
+
+    IMPORTANT:
+
+        alpha_max_by_term is NOT learnable.
+
+        It is a fixed TRAIN-only numerical-safety hyperparameter
+        declared independently for each PDE term.
+
+        The SAME alpha_max_by_term dictionary must be used by
+        R3-1a and R3-1b.
+
+    Therefore:
+
+        learnable capacity remains exactly two scalar parameters:
+
+            raw_alpha.buoyancy_advection
+            raw_alpha.buoyancy_forcing
+
+    ============================================================
     Explicitly NOT included in R3-1
-    ------------------------------------------------------------
+    ============================================================
 
         - StateParam
         - Utility Gate
@@ -109,15 +144,19 @@ class R3PDECouplingFNO2d(nn.Module):
         canonical_metadata: CanonicalMetadata,
         *,
         representation_mode: str,
+        alpha_max_by_term: Mapping[str, float],
         in_channels: int = 16,
         out_channels: int = 4,
         modes1: int = 16,
         modes2: int = 16,
         width: int = 32,
-        alpha_max: float = 0.25,
         freeze_m6: bool = True,
     ):
         super().__init__()
+
+        # ========================================================
+        # 0. Frozen architecture contract validation
+        # ========================================================
 
         if (
             representation_mode
@@ -129,16 +168,79 @@ class R3PDECouplingFNO2d(nn.Module):
                 f"got {representation_mode!r}"
             )
 
-        if alpha_max <= 0.0:
-            raise ValueError(
-                f"alpha_max must be positive, got {alpha_max}"
-            )
-
         self.representation_mode = (
             representation_mode
         )
 
-        self.alpha_max = float(alpha_max)
+        # --------------------------------------------------------
+        # R3-0C:
+        # one FIXED upper bound per PDE term.
+        #
+        # Exact key equality is required so neither arm can
+        # silently omit or add a term-specific capacity.
+        # --------------------------------------------------------
+
+        supplied_terms = set(
+            alpha_max_by_term.keys()
+        )
+
+        expected_terms = set(
+            self.ACTIVE_TERMS
+        )
+
+        if supplied_terms != expected_terms:
+            missing = sorted(
+                expected_terms
+                -
+                supplied_terms
+            )
+
+            extra = sorted(
+                supplied_terms
+                -
+                expected_terms
+            )
+
+            raise ValueError(
+                "alpha_max_by_term must contain "
+                "exactly the active R3-1 terms.\n"
+                f"Expected: {sorted(expected_terms)}\n"
+                f"Missing:  {missing}\n"
+                f"Extra:    {extra}"
+            )
+
+        normalized_alpha_max = {}
+
+        for term_name in self.ACTIVE_TERMS:
+
+            value = float(
+                alpha_max_by_term[
+                    term_name
+                ]
+            )
+
+            if (
+                not math.isfinite(value)
+                or
+                value <= 0.0
+            ):
+                raise ValueError(
+                    "Every R3 alpha upper bound "
+                    "must be finite and positive.\n"
+                    f"term={term_name}\n"
+                    f"value={value}"
+                )
+
+            normalized_alpha_max[
+                term_name
+            ] = value
+
+        # Ordinary Python floats on purpose:
+        # these are fixed hyperparameters, NOT learnable
+        # parameters and NOT representation-dependent buffers.
+        self.alpha_max_by_term = (
+            normalized_alpha_max
+        )
 
         # ========================================================
         # 1. Audited M6 FieldWise backbone
@@ -159,8 +261,9 @@ class R3PDECouplingFNO2d(nn.Module):
         #     use real metadata.
         #
         # Naive arm:
-        #     use identity normalization metadata while preserving
-        #     the SAME grid, dt and parameter semantics.
+        #     use identity normalization metadata while
+        #     preserving the SAME grid, dt and parameter
+        #     semantics.
         #
         # Both arms then use the SAME CanonicalPDECompiler.
         # ========================================================
@@ -169,7 +272,10 @@ class R3PDECouplingFNO2d(nn.Module):
             canonical_metadata
         )
 
-        if representation_mode == "canonical":
+        if (
+            representation_mode
+            == "canonical"
+        ):
             compiler_metadata = (
                 canonical_metadata
             )
@@ -181,23 +287,26 @@ class R3PDECouplingFNO2d(nn.Module):
                 )
             )
 
-        self.compiler = CanonicalPDECompiler(
-            compiler_metadata
+        self.compiler = (
+            CanonicalPDECompiler(
+                compiler_metadata
+            )
         )
 
         # ========================================================
         # 3. Shared zero-init bounded scalar gates
         #
-        # One scalar per active PDE term.
+        # One raw learnable scalar per active PDE term:
         #
         # alpha_j =
-        #     alpha_max * tanh(raw_alpha_j)
+        #     alpha_max_by_term[j]
+        #     * tanh(raw_alpha_j)
         #
-        # raw_alpha_j == 0 at initialization, therefore:
+        # raw_alpha_j == 0 at initialization:
         #
         #     alpha_j == 0
         #
-        # and epoch-0 output == pure M6 exactly.
+        # therefore epoch-0 output == pure M6 exactly.
         # ========================================================
 
         self.raw_alpha = nn.ParameterDict(
@@ -261,10 +370,12 @@ class R3PDECouplingFNO2d(nn.Module):
             in base_metadata.field_order
         }
 
-        identity_norm = FieldNormalization(
-            mean=means,
-            std=stds,
-            eps=eps,
+        identity_norm = (
+            FieldNormalization(
+                mean=means,
+                std=stds,
+                eps=eps,
+            )
         )
 
         return CanonicalMetadata(
@@ -275,7 +386,8 @@ class R3PDECouplingFNO2d(nn.Module):
             grid=base_metadata.grid,
             time=base_metadata.time,
             parameter_order=(
-                base_metadata.parameter_order
+                base_metadata
+                .parameter_order
             ),
         )
 
@@ -298,31 +410,51 @@ class R3PDECouplingFNO2d(nn.Module):
                 != TermSemantic.RATE
             ):
                 raise RuntimeError(
-                    f"Active R3 term {term_name!r} "
+                    f"Active R3 term "
+                    f"{term_name!r} "
                     "must be a RATE term."
                 )
 
             if len(spec.targets) != 1:
                 raise RuntimeError(
-                    f"R3-1 active term {term_name!r} "
-                    "must have exactly one target."
+                    f"R3-1 active term "
+                    f"{term_name!r} "
+                    "must have exactly "
+                    "one target."
                 )
 
             if (
                 term_name
-                not in self.TERM_TO_OUTPUT_INDEX
+                not in
+                self.TERM_TO_OUTPUT_INDEX
             ):
                 raise RuntimeError(
-                    f"Missing output routing for "
-                    f"{term_name!r}."
+                    "Missing output routing "
+                    f"for {term_name!r}."
                 )
 
-        if set(self.ACTIVE_TERMS) != set(
-            self.TERM_TO_OUTPUT_INDEX
+        if (
+            set(self.ACTIVE_TERMS)
+            !=
+            set(
+                self.TERM_TO_OUTPUT_INDEX
+            )
         ):
             raise RuntimeError(
                 "ACTIVE_TERMS and "
                 "TERM_TO_OUTPUT_INDEX mismatch."
+            )
+
+        if (
+            set(self.ACTIVE_TERMS)
+            !=
+            set(
+                self.alpha_max_by_term
+            )
+        ):
+            raise RuntimeError(
+                "ACTIVE_TERMS and "
+                "alpha_max_by_term mismatch."
             )
 
     # ============================================================
@@ -333,15 +465,23 @@ class R3PDECouplingFNO2d(nn.Module):
         self,
     ) -> None:
 
-        for parameter in self.m6.parameters():
-            parameter.requires_grad = False
+        for parameter in (
+            self.m6.parameters()
+        ):
+            parameter.requires_grad = (
+                False
+            )
 
     def unfreeze_m6(
         self,
     ) -> None:
 
-        for parameter in self.m6.parameters():
-            parameter.requires_grad = True
+        for parameter in (
+            self.m6.parameters()
+        ):
+            parameter.requires_grad = (
+                True
+            )
 
     def load_m6_state_dict(
         self,
@@ -365,20 +505,50 @@ class R3PDECouplingFNO2d(nn.Module):
         term_name: str,
     ) -> torch.Tensor:
 
-        if term_name not in self.raw_alpha:
+        if (
+            term_name
+            not in self.raw_alpha
+        ):
             raise KeyError(
-                f"Inactive / unknown R3 term "
+                "Inactive / unknown R3 term "
                 f"{term_name!r}"
             )
 
+        alpha_max = (
+            self.alpha_max_by_term[
+                term_name
+            ]
+        )
+
         return (
-            self.alpha_max
+            alpha_max
             *
             torch.tanh(
                 self.raw_alpha[
                     term_name
                 ]
             )
+        )
+
+    def alpha_max_for_term(
+        self,
+        term_name: str,
+    ) -> float:
+
+        if (
+            term_name
+            not in
+            self.alpha_max_by_term
+        ):
+            raise KeyError(
+                "Inactive / unknown R3 term "
+                f"{term_name!r}"
+            )
+
+        return float(
+            self.alpha_max_by_term[
+                term_name
+            ]
         )
 
     # ============================================================
@@ -388,7 +558,9 @@ class R3PDECouplingFNO2d(nn.Module):
     def forward(
         self,
         x_norm: torch.Tensor,
-        params: Optional[torch.Tensor] = None,
+        params: Optional[
+            torch.Tensor
+        ] = None,
         return_components: bool = False,
     ):
         """
@@ -400,11 +572,10 @@ class R3PDECouplingFNO2d(nn.Module):
         params:
             [B,2] = [log10(Ra), log10(Pr)].
 
-            Currently the two active R3-1 terms do not require
-            parameter coefficients, but this argument is retained
-            so the shared model interface already matches the
-            canonical compiler contract and future registered
-            PDE terms.
+            Current R3-1 active terms do not require
+            parameter-dependent PDE coefficients, but this
+            argument is retained so the model interface remains
+            compatible with the canonical compiler contract.
 
         Returns
         -------
@@ -416,8 +587,10 @@ class R3PDECouplingFNO2d(nn.Module):
         # 1. Frozen M6 base delta
         # --------------------------------------------------------
 
-        base_delta_norm = self.m6(
-            x_norm
+        base_delta_norm = (
+            self.m6(
+                x_norm
+            )
         )
 
         # --------------------------------------------------------
@@ -449,7 +622,9 @@ class R3PDECouplingFNO2d(nn.Module):
         # 3. Shared typed PDE compilation + sparse routing
         # --------------------------------------------------------
 
-        for term_name in self.ACTIVE_TERMS:
+        for term_name in (
+            self.ACTIVE_TERMS
+        ):
 
             spec = get_rbc_term_spec(
                 term_name
@@ -457,8 +632,10 @@ class R3PDECouplingFNO2d(nn.Module):
 
             term_param = (
                 params
-                if spec.requires_param_coefficients
-                else None
+                if
+                spec.requires_param_coefficients
+                else
+                None
             )
 
             compiled = (
@@ -475,8 +652,10 @@ class R3PDECouplingFNO2d(nn.Module):
                 is None
             ):
                 raise RuntimeError(
-                    f"Active term {term_name!r} "
-                    "did not produce a target delta."
+                    f"Active term "
+                    f"{term_name!r} "
+                    "did not produce a "
+                    "target delta."
                 )
 
             signal = (
@@ -485,9 +664,11 @@ class R3PDECouplingFNO2d(nn.Module):
 
             if signal.ndim != 3:
                 raise RuntimeError(
-                    f"R3-1 active term {term_name!r} "
+                    f"R3-1 active term "
+                    f"{term_name!r} "
                     "must produce [B,X,Y], "
-                    f"got {tuple(signal.shape)}"
+                    f"got "
+                    f"{tuple(signal.shape)}"
                 )
 
             alpha = self.gate_value(
@@ -554,6 +735,11 @@ class R3PDECouplingFNO2d(nn.Module):
             "active_terms":
                 self.ACTIVE_TERMS,
 
+            "alpha_max_by_term":
+                dict(
+                    self.alpha_max_by_term
+                ),
+
             "base_delta_norm":
                 base_delta_norm,
 
@@ -580,7 +766,10 @@ class R3PDECouplingFNO2d(nn.Module):
 
         return [
             name
-            for name, parameter
+            for (
+                name,
+                parameter,
+            )
             in self.named_parameters()
             if parameter.requires_grad
         ]

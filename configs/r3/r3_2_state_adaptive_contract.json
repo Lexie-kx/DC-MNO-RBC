@@ -1,0 +1,366 @@
+{
+  "contract_name": "R3-2 State-Adaptive Dimension-Valid Coupling",
+  "contract_version": "1.0",
+  "contract_status": "LOCKED_BEFORE_FORMAL_TRAINING",
+
+  "parent": {
+    "stage": "R3-1b Canonical Dimension/Representation-Valid PDE Coupling",
+    "git_commit": "bf5a0e4485d8c5398e3724e43cfba81e2c96dbf3",
+    "required_parent_representation": "canonical",
+    "parent_question_already_closed": "Does dimension/representation-valid PDE coupling outperform a matched naive representation?",
+    "r3_2_question": "Given a dimension-valid canonical PDE interface, does adapting coupling strength to the current inference-visible state provide value beyond parameter-only adaptation?"
+  },
+
+  "causal_decomposition": {
+    "r3_2a": {
+      "name": "R3-2a ParamOnly",
+      "role": "CONTROL",
+      "meaning": "Same conditioner architecture and trainable capacity as R3-2b, but current-state information is masked out. Only logRa/logPr remain visible."
+    },
+    "r3_2b": {
+      "name": "R3-2b StateParam",
+      "role": "FORMAL_CANDIDATE",
+      "meaning": "Same conditioner architecture and trainable capacity as R3-2a, with current-state and current canonical-PDE-signal summaries visible."
+    },
+    "primary_contrast": "R3-2b - R3-2a",
+    "primary_contrast_interpretation": "value of current-state information",
+    "secondary_contrast_param": "R3-2a - R3-1b",
+    "secondary_contrast_param_interpretation": "value of parameter-only adaptive coupling",
+    "secondary_contrast_total": "R3-2b - R3-1b",
+    "secondary_contrast_total_interpretation": "total value of state-parameter adaptive coupling"
+  },
+
+  "frozen_r3_1_structure": {
+    "backbone": "M6-FieldWiseEncoder-H4",
+    "backbone_frozen": true,
+    "representation_mode": "canonical",
+    "canonical_pde_compiler_frozen": true,
+
+    "active_pde_terms": [
+      "buoyancy_advection",
+      "buoyancy_forcing"
+    ],
+
+    "routing": {
+      "buoyancy_advection": {
+        "expression": "-u dot grad(b)",
+        "target_field": "buoyancy"
+      },
+      "buoyancy_forcing": {
+        "expression": "b",
+        "target_field": "u_y"
+      }
+    },
+
+    "formal_alpha_max_by_term": {
+      "buoyancy_advection": 0.021792202037947142,
+      "buoyancy_forcing": 1.2050772196677188e-05
+    },
+
+    "alpha_capacity_learnable": false,
+    "new_pde_paths_forbidden": true,
+    "pde_loss_forbidden": true,
+    "rmscap_forbidden": true,
+    "utility_gate_forbidden": true,
+    "learnable_spatial_phi_forbidden": true
+  },
+
+  "parent_checkpoints": {
+    "unseen_pr": {
+      "checkpoint": "checkpoints/r3_1/r3_1b_canonical_h4_unseen_pr_best.pth",
+      "sha256": "20c535eeef85134f2aed2230218511766fdde866b228f8e6de8352953f393008",
+      "best_epoch": 20,
+      "best_val_loss": 0.2226371031294587
+    },
+    "unseen_ra": {
+      "checkpoint": "checkpoints/r3_1/r3_1b_canonical_h4_unseen_ra_best.pth",
+      "sha256": "d2ea9659aaa3f1687bb63d78cfdcf98a6cae651e485c3d6f58c6193843e1ba8d",
+      "best_epoch": 20,
+      "best_val_loss": 0.18668615653790455
+    }
+  },
+
+  "gate_parameterization": {
+    "parent_raw_alpha_source": "load exactly from split-matched frozen R3-1b best checkpoint",
+    "parent_raw_alpha_trainable": false,
+
+    "equation": "alpha_j(s_t,Ra,Pr) = alpha_max_j * tanh(raw_alpha_parent_j + delta_raw_j(s_t,Ra,Pr))",
+
+    "conditioner_output": "delta_raw for the two active PDE terms",
+    "conditioner_output_order": [
+      "buoyancy_advection",
+      "buoyancy_forcing"
+    ],
+
+    "additional_delta_raw_bound": "none",
+    "safety_bound": "The existing fixed per-term alpha_max remains the final nonlearnable coupling-capacity bound.",
+
+    "epoch0_requirement": "delta_raw must be exactly zero for every sample so R3-2a and R3-2b reproduce R3-1b exactly at epoch 0."
+  },
+
+  "conditioner": {
+    "architecture_shared_between_arms": true,
+    "input_dim": 10,
+    "hidden_dims": [
+      32,
+      16
+    ],
+    "output_dim": 2,
+    "activation": "GELU",
+
+    "layers": [
+      "Linear(10,32)",
+      "GELU",
+      "Linear(32,16)",
+      "GELU",
+      "Linear(16,2)"
+    ],
+
+    "final_linear_weight_initialization": "exact zeros",
+    "final_linear_bias_initialization": "exact zeros",
+
+    "nonfinal_initialization": "identical deterministic initialization for R3-2a and R3-2b under the same seed",
+
+    "same_parameter_names_required": true,
+    "same_trainable_parameter_count_required": true,
+    "same_epoch0_conditioner_state_required": true
+  },
+
+  "conditioner_features": {
+    "feature_count": 10,
+
+    "inference_visibility_rule": "Every feature must be computable from the current autoregressive prediction state, current canonical PDE signals, and Ra/Pr. No current or future GT information is allowed.",
+
+    "feature_order": [
+      "state_b_mean_norm",
+      "state_b_rms_norm",
+      "state_ux_mean_norm",
+      "state_ux_rms_norm",
+      "state_uy_mean_norm",
+      "state_uy_rms_norm",
+      "log1p_canonical_buoyancy_advection_signal_rms_norm",
+      "log1p_canonical_buoyancy_forcing_signal_rms_norm",
+      "logRa",
+      "logPr"
+    ],
+
+    "state_feature_definition": {
+      "state_source": "latest predicted state in the autoregressive context",
+      "state_space": "field-wise normalized model state",
+      "ground_truth_allowed": false,
+
+      "mean": "spatial mean over X,Y",
+      "rms": "sqrt(mean(x^2) + 1e-12)",
+
+      "pressure_state_summary_included": false,
+      "pressure_exclusion_reason": "R3-2 must adapt the two already-active buoyancy/velocity coupling pathways without introducing a new pressure-conditioned mechanism."
+    },
+
+    "canonical_signal_feature_definition": {
+      "source": "the two unweighted canonical PDE coupling signals compiled at the current predicted state before adaptive gate multiplication",
+      "space": "final normalized finite-step target-delta merge space",
+      "rms": "sqrt(mean(signal_norm^2) + 1e-12)",
+      "transform": "log1p(rms)",
+      "ground_truth_allowed": false
+    },
+
+    "parameter_features": {
+      "order": [
+        "logRa",
+        "logPr"
+      ],
+      "definition": "same log10(Ra), log10(Pr) parameter representation already used by the project",
+      "ground_truth_future_state_information": false
+    },
+
+    "train_fitted_feature_normalization": false,
+    "reason_no_fitted_feature_normalization": "Avoid introducing arm-specific feature-statistics fitting or another train-derived preprocessing degree of freedom in the R3-2 causal comparison."
+  },
+
+  "arm_input_policy": {
+    "r3_2a_paramonly": {
+      "input_tensor_shape": "[B,10]",
+      "features_0_to_7": "exact zeros after feature construction",
+      "features_8_to_9": "real logRa/logPr",
+      "architecture_difference_from_r3_2b": "none",
+      "trainable_capacity_difference_from_r3_2b": "none"
+    },
+
+    "r3_2b_stateparam": {
+      "input_tensor_shape": "[B,10]",
+      "features_0_to_7": "real current inference-visible state/canonical-signal summaries",
+      "features_8_to_9": "real logRa/logPr",
+      "architecture_difference_from_r3_2a": "none",
+      "trainable_capacity_difference_from_r3_2a": "none"
+    }
+  },
+
+  "trainable_parameter_policy": {
+    "trainable": [
+      "conditioner.Linear(10,32)",
+      "conditioner.Linear(32,16)",
+      "conditioner.Linear(16,2)"
+    ],
+
+    "frozen": [
+      "M6 backbone",
+      "R3-1b parent raw_alpha.buoyancy_advection",
+      "R3-1b parent raw_alpha.buoyancy_forcing",
+      "formal alpha_max_by_term",
+      "canonical metadata",
+      "canonical PDE compiler",
+      "PDE topology and routing"
+    ],
+
+    "only_conditioner_trainable": true
+  },
+
+  "epoch0_matched_requirements": {
+    "r3_2a_equals_r3_1b": "exact",
+    "r3_2b_equals_r3_1b": "exact",
+    "r3_2a_equals_r3_2b": "exact",
+
+    "required_checks": [
+      "all final conditioner outputs delta_raw are exactly zero",
+      "effective alpha values exactly equal frozen R3-1b alpha values",
+      "predicted normalized delta exactly equals R3-1b",
+      "predicted next normalized state exactly equals R3-1b",
+      "embedded M6 state_dict exactly equals independently audited M6",
+      "R3-2a and R3-2b conditioner parameter tensors are identical at initialization"
+    ]
+  },
+
+  "formal_training_protocol": {
+    "seed": 42,
+    "formal_runs": 4,
+
+    "runs": [
+      "unseen_pr / R3-2a ParamOnly",
+      "unseen_pr / R3-2b StateParam",
+      "unseen_ra / R3-2a ParamOnly",
+      "unseen_ra / R3-2b StateParam"
+    ],
+
+    "epochs": 20,
+    "batch_size": 4,
+    "rollout_steps": 4,
+    "rollout_weights": [
+      1.0,
+      0.8,
+      0.6,
+      0.4
+    ],
+
+    "teacher_forcing_after_initial_context": false,
+    "training_mode": "free-autoregressive H4",
+    "loss": "FieldWiseRelativeL2Loss",
+    "optimizer": "Adam",
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0,
+
+    "model_selection_split": "VAL only",
+    "epoch0_parent_model_participates_in_model_selection": true,
+
+    "arm_specific_hyperparameter_tuning_forbidden": true,
+    "different_training_budget_between_arms_forbidden": true
+  },
+
+  "data_protocol": {
+    "unseen_pr": {
+      "split": "data/splits/unseen_pr_split.json",
+      "stats": "data/stats/rbc_field_stats_unseen_pr.json"
+    },
+
+    "unseen_ra": {
+      "split": "data/splits/unseen_ra_split.json",
+      "stats": "data/stats/rbc_field_stats_unseen_ra.json"
+    }
+  },
+
+  "test_embargo": {
+    "test_access_during_architecture_design": false,
+    "test_access_during_formal_training": false,
+    "test_access_during_val_model_selection": false,
+
+    "release_condition": "All four seed42 R3-2 formal runs are complete under the locked architecture/training contract.",
+
+    "test_must_not_be_used_for": [
+      "feature selection",
+      "conditioner architecture selection",
+      "learning-rate tuning",
+      "epoch-budget tuning",
+      "gate-capacity tuning",
+      "parent-checkpoint replacement",
+      "arm-specific modification"
+    ]
+  },
+
+  "formal_post_training_evaluation": {
+    "prediction_rollout": {
+      "split": "TEST",
+      "window_protocol": "all legal H16 TEST windows",
+      "temporal_start_stride": 1,
+      "horizons": [
+        1,
+        4,
+        8,
+        16
+      ],
+      "full_curve": "h=1..16",
+      "free_autoregressive": true
+    },
+
+    "physics": {
+      "split": "same TEST windows as formal prediction rollout",
+      "semantics": "FD-based comparative proxy, not solver-level PDE violation",
+      "physics_dx": 0.015625,
+      "physics_dy": 0.015873015873015872,
+      "physics_dt": 0.25
+    }
+  },
+
+  "decision_logic": {
+    "primary_question": "Does current-state information improve a capacity-matched adaptive canonical coupling mechanism beyond parameter-only conditioning?",
+
+    "primary_comparison": "R3-2b StateParam - R3-2a ParamOnly",
+
+    "secondary_comparisons": [
+      "R3-2a ParamOnly - R3-1b Canonical",
+      "R3-2b StateParam - R3-1b Canonical"
+    ],
+
+    "negative_error_difference_means": "first model is better",
+
+    "no_required_claim": "R3-2 is not required to beat R3-1b at every individual horizon or every physics proxy to establish state-information value.",
+
+    "state_adaptation_claim_requires": "A reproducible advantage of R3-2b over the capacity-matched R3-2a control under the locked validation and post-training evaluation protocol.",
+
+    "r3_3_not_allowed_to_begin_until": "R3-2 matched training, rollout, physics evaluation, and causal interpretation are closed."
+  },
+
+  "explicitly_forbidden_in_r3_2": [
+    "Utility labels",
+    "Utility Gate",
+    "future GT features",
+    "GT-derived state features at inference",
+    "temporal d1/d2 engineered features",
+    "horizon index as conditioner input",
+    "RMSCap",
+    "PDE loss",
+    "new PDE terms",
+    "pressure-gradient coupling pathway",
+    "momentum-advection coupling pathway",
+    "viscosity coupling pathway",
+    "buoyancy-diffusion coupling pathway",
+    "learnable spatial Phi",
+    "arm-specific alpha_max",
+    "arm-specific feature normalization",
+    "TEST-driven redesign"
+  ],
+
+  "amendment_policy": {
+    "architecture_change_after_formal_training_starts": "forbidden",
+    "mechanical_bug_fix": "allowed only if identified before interpreting formal results, documented, regression-tested, and applied identically to both arms",
+    "scientific_design_change": "requires a new contract version and a fresh matched experiment; old formal results must remain intact"
+  }
+}

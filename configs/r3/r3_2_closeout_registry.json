@@ -1,0 +1,503 @@
+{
+  "stage": "R3-2",
+  "registry_status": "CLOSED_AFTER_FORMAL_TEST",
+  "closeout_classification": "MIXED",
+  "primary_hypothesis": {
+    "comparison": "R3-2b-StateParam - R3-2a-ParamOnly",
+    "causal_question": "Does current-state information provide incremental value beyond the matched parameter-only adaptive conditioner?",
+    "final_status": "NOT_SUPPORTED",
+    "reason": "Formal TEST rollout shows no StateParam advantage on unseen-Pr and StateParam is slightly worse than ParamOnly at all four reported unseen-Ra horizons. Physics effects are small and metric-dependent."
+  },
+  "secondary_findings": {
+    "parameter_adaptive_value": "WEAKLY_SUPPORTED",
+    "state_dependent_gate_behavior": "SUPPORTED_ON_UNSEEN_RA",
+    "state_information_prediction_value": "NOT_SUPPORTED",
+    "state_information_physics_value": "MIXED",
+    "unseen_pr_gate_saturation": "STRONGLY_SUPPORTED"
+  },
+  "interpretation_boundary": {
+    "supported_statement": "State-visible conditioning can alter the dimension-valid coupling policy, especially on unseen-Ra, but the current continuous gate-strength modulation does not yield consistent predictive improvement over the capacity-matched ParamOnly control.",
+    "not_supported_statement": "The results do NOT establish that state information is generally useless, nor that state-selective physics is unnecessary.",
+    "next_causal_question": "R3-3 should test utility/state selection: when a dimension-valid physics pathway should be trusted or suppressed, rather than only how strongly it should be applied."
+  },
+  "statistical_scope": {
+    "formal_seed": 42,
+    "multi_seed_statistical_claim": false,
+    "note": "R3-2 formal causal closeout is based on the frozen seed-42 protocol; tiny numerical differences must not be described as statistically robust."
+  },
+  "pretest_registry": {
+    "path": "configs/r3/r3_2_pretest_checkpoint_registry.json",
+    "sha256": "8a67403db5ab10d8035adafddd9d471b0afa14400e78f6767cbb564fe6fb1efe",
+    "formal_checkpoints": {
+      "unseen_pr": {
+        "R3-2a": {
+          "role": "ParamOnly matched control",
+          "adaptation_mode": "paramonly",
+          "checkpoint": "checkpoints/r3_2/r3_2a_paramonly_h4_unseen_pr_best.pth",
+          "sha256": "05b34bfed1c002bec215a1b3da5ce4bd15ea23b12acc8252afb3e66ed2720d45",
+          "best_epoch": 10,
+          "best_val_loss": 0.22204328258939113,
+          "trainable_parameter_count": 914,
+          "parent_r3_1b_sha256": "20c535eeef85134f2aed2230218511766fdde866b228f8e6de8352953f393008",
+          "test_accessed": false
+        },
+        "R3-2b": {
+          "role": "StateParam formal candidate",
+          "adaptation_mode": "stateparam",
+          "checkpoint": "checkpoints/r3_2/r3_2b_stateparam_h4_unseen_pr_best.pth",
+          "sha256": "9e5697a214a09c554e91c326047fc75e5b3a8f99e3fee99c48e9e9673b7a067a",
+          "best_epoch": 10,
+          "best_val_loss": 0.22204328837093487,
+          "trainable_parameter_count": 914,
+          "parent_r3_1b_sha256": "20c535eeef85134f2aed2230218511766fdde866b228f8e6de8352953f393008",
+          "test_accessed": false
+        }
+      },
+      "unseen_ra": {
+        "R3-2a": {
+          "role": "ParamOnly matched control",
+          "adaptation_mode": "paramonly",
+          "checkpoint": "checkpoints/r3_2/r3_2a_paramonly_h4_unseen_ra_best.pth",
+          "sha256": "c7eeb2de53cbf0eaef7e25c14ec733f1dce4f9da2d0a4dc66df6214a6ec044fb",
+          "best_epoch": 6,
+          "best_val_loss": 0.1865624729210117,
+          "trainable_parameter_count": 914,
+          "parent_r3_1b_sha256": "d2ea9659aaa3f1687bb63d78cfdcf98a6cae651e485c3d6f58c6193843e1ba8d",
+          "test_accessed": false
+        },
+        "R3-2b": {
+          "role": "StateParam formal candidate",
+          "adaptation_mode": "stateparam",
+          "checkpoint": "checkpoints/r3_2/r3_2b_stateparam_h4_unseen_ra_best.pth",
+          "sha256": "fc64be2ba2b19fa27469c992391a4dcf41133a9a32c965e17b97f15e371c6b39",
+          "best_epoch": 19,
+          "best_val_loss": 0.18654042271409838,
+          "trainable_parameter_count": 914,
+          "parent_r3_1b_sha256": "d2ea9659aaa3f1687bb63d78cfdcf98a6cae651e485c3d6f58c6193843e1ba8d",
+          "test_accessed": false
+        }
+      }
+    }
+  },
+  "frozen_code_provenance": {
+    "architecture_contract_commit": "0594afd",
+    "architecture_commit": "d96877d",
+    "trainer_commit": "849791b",
+    "pretest_checkpoint_registry_commit": "a6c467d",
+    "rollout_evaluator_commit": "398204a",
+    "physics_evaluator_commit": "9952b2b",
+    "rollout_evaluator_sha256": "888f1205550af0caf582ce50eac2ff96d0f891f4862d6b083b64e47f9d764949",
+    "physics_evaluator_sha256": "fd56ef510b59664cede536904c26c65cb386ec99c23ef53ea4b72228a6ab0740"
+  },
+  "formal_results": {
+    "unseen_pr": {
+      "validation": {
+        "R3-2a": {
+          "best_epoch": 10,
+          "best_val_loss": 0.22204328258939113,
+          "checkpoint": "checkpoints/r3_2/r3_2a_paramonly_h4_unseen_pr_best.pth",
+          "checkpoint_sha256": "05b34bfed1c002bec215a1b3da5ce4bd15ea23b12acc8252afb3e66ed2720d45"
+        },
+        "R3-2b": {
+          "best_epoch": 10,
+          "best_val_loss": 0.22204328837093487,
+          "checkpoint": "checkpoints/r3_2/r3_2b_stateparam_h4_unseen_pr_best.pth",
+          "checkpoint_sha256": "9e5697a214a09c554e91c326047fc75e5b3a8f99e3fee99c48e9e9673b7a067a"
+        },
+        "R3-1b": {
+          "best_val_loss": 0.2226371031294587
+        }
+      },
+      "rollout_test": {
+        "global_rel_l2_percent": {
+          "R3-1b-Canonical": {
+            "1": 7.239446990916316,
+            "4": 13.593028456975809,
+            "8": 19.451816453879047,
+            "16": 32.268187690724844
+          },
+          "R3-2a-ParamOnly": {
+            "1": 7.234721738040606,
+            "4": 13.589504370972552,
+            "8": 19.4509955549344,
+            "16": 32.27293967187862
+          },
+          "R3-2b-StateParam": {
+            "1": 7.234721753737945,
+            "4": 13.589504289388454,
+            "8": 19.450995931545933,
+            "16": 32.27294020100831
+          }
+        },
+        "global_auc_trapz": {
+          "R3-1b-Canonical": 304.8779329863349,
+          "R3-2a-ParamOnly": 304.87393882144534,
+          "R3-2b-StateParam": 304.8739573151076
+        },
+        "primary_global_difference_pp": {
+          "1": 1.5697339428299983e-08,
+          "4": -8.15840976997606e-08,
+          "8": 3.766115348469157e-07,
+          "16": 5.291296929499367e-07
+        }
+      },
+      "gate_diagnostics": {
+        "R3-2a-ParamOnly": {
+          "1": {
+            "alpha_advection_mean": 0.0217921752482652,
+            "alpha_advection_std": 2.7815223714463562e-08,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9999987706757776,
+            "alpha_advection_sat99_fraction": 1.0,
+            "alpha_forcing_mean": 1.2050591673566185e-05,
+            "alpha_forcing_std": 1.802666766418055e-10,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.999985019788931,
+            "alpha_forcing_sat99_fraction": 1.0
+          },
+          "4": {
+            "alpha_advection_mean": 0.0217921752482652,
+            "alpha_advection_std": 2.7815223714463562e-08,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9999987706757776,
+            "alpha_advection_sat99_fraction": 1.0,
+            "alpha_forcing_mean": 1.2050591673566185e-05,
+            "alpha_forcing_std": 1.802666766418055e-10,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.999985019788931,
+            "alpha_forcing_sat99_fraction": 1.0
+          },
+          "8": {
+            "alpha_advection_mean": 0.0217921752482652,
+            "alpha_advection_std": 2.7815223714463562e-08,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9999987706757776,
+            "alpha_advection_sat99_fraction": 1.0,
+            "alpha_forcing_mean": 1.2050591673566185e-05,
+            "alpha_forcing_std": 1.802666766418055e-10,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.999985019788931,
+            "alpha_forcing_sat99_fraction": 1.0
+          },
+          "16": {
+            "alpha_advection_mean": 0.0217921752482652,
+            "alpha_advection_std": 2.7815223714463562e-08,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9999987706757776,
+            "alpha_advection_sat99_fraction": 1.0,
+            "alpha_forcing_mean": 1.2050591673566185e-05,
+            "alpha_forcing_std": 1.802666766418055e-10,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.999985019788931,
+            "alpha_forcing_sat99_fraction": 1.0
+          }
+        },
+        "R3-2b-StateParam": {
+          "1": {
+            "alpha_advection_mean": 0.0217921371667534,
+            "alpha_advection_std": 6.492051536464823e-08,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9999970231923532,
+            "alpha_advection_sat99_fraction": 1.0,
+            "alpha_forcing_mean": 1.2050620300566908e-05,
+            "alpha_forcing_std": 1.5509409907696282e-10,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.999987395321412,
+            "alpha_forcing_sat99_fraction": 1.0
+          },
+          "4": {
+            "alpha_advection_mean": 0.0217921403156202,
+            "alpha_advection_std": 6.352480213263987e-08,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9999971676874702,
+            "alpha_advection_sat99_fraction": 1.0,
+            "alpha_forcing_mean": 1.2050627795851229e-05,
+            "alpha_forcing_std": 1.5177307799618247e-10,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.9999880172968512,
+            "alpha_forcing_sat99_fraction": 1.0
+          },
+          "8": {
+            "alpha_advection_mean": 0.021792144782136,
+            "alpha_advection_std": 6.180370914253495e-08,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9999973726468298,
+            "alpha_advection_sat99_fraction": 1.0,
+            "alpha_forcing_mean": 1.205063844966468e-05,
+            "alpha_forcing_std": 1.4764791093725175e-10,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.9999889013740924,
+            "alpha_forcing_sat99_fraction": 1.0
+          },
+          "16": {
+            "alpha_advection_mean": 0.0217921534445857,
+            "alpha_advection_std": 5.769879713507025e-08,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9999977701490984,
+            "alpha_advection_sat99_fraction": 1.0,
+            "alpha_forcing_mean": 1.2050659184646768e-05,
+            "alpha_forcing_std": 1.3771122744021684e-10,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.999990622009232,
+            "alpha_forcing_sat99_fraction": 1.0
+          }
+        }
+      },
+      "physics_test": {
+        "primary_key_metric_differences": {
+          "1": {
+            "adv_b_rel_l2_percent_diff": 1.8981992866429213e-08,
+            "r_b_normalized_mismatch_diff": 1.2543513450147259e-09,
+            "div_error_mae_diff": -1.946852401513155e-12,
+            "vorticity_rel_l2_percent_diff": 6.544098596350523e-11
+          },
+          "4": {
+            "adv_b_rel_l2_percent_diff": 1.0707222713790545e-05,
+            "r_b_normalized_mismatch_diff": -4.029991285126045e-08,
+            "div_error_mae_diff": -1.870360646916147e-08,
+            "vorticity_rel_l2_percent_diff": -1.7631339304102769e-06
+          },
+          "8": {
+            "adv_b_rel_l2_percent_diff": 7.042750353036809e-05,
+            "r_b_normalized_mismatch_diff": -3.508975111587987e-07,
+            "div_error_mae_diff": 3.3810232974440524e-08,
+            "vorticity_rel_l2_percent_diff": 8.606150245782374e-06
+          },
+          "16": {
+            "adv_b_rel_l2_percent_diff": 9.097937083879516e-05,
+            "r_b_normalized_mismatch_diff": 5.098971060935042e-07,
+            "div_error_mae_diff": 1.921745653721274e-07,
+            "vorticity_rel_l2_percent_diff": -4.164457266142563e-06
+          }
+        }
+      },
+      "evidence_files": {
+        "rollout_summary": {
+          "path": "outputs/tables/r3_2_rollout/r3_2_rollout_unseen_pr_seed42_summary.csv",
+          "sha256": "a51bd2d89bffe55bc69080a0bfc5a2c69e6474e93870fdbdf060368d639a04fb"
+        },
+        "rollout_growth": {
+          "path": "outputs/tables/r3_2_rollout/r3_2_rollout_unseen_pr_seed42_global_growth_auc.csv",
+          "sha256": "fe5aa1d393036d8e29b3484dcf926b7e5d4415c8e4a88984d27c979559912b67"
+        },
+        "rollout_gates": {
+          "path": "outputs/tables/r3_2_rollout/r3_2_rollout_unseen_pr_seed42_gate_curve.csv",
+          "sha256": "6725118c2478aa42640b107e0f90978e1b86b3048db5b97e1ddebdb69e190907"
+        },
+        "rollout_differences": {
+          "path": "outputs/tables/r3_2_rollout/r3_2_rollout_unseen_pr_seed42_differences.csv",
+          "sha256": "25e5a76f556f9d25761a3e8027a6ee9801ffdf57252bf42b6c7ad4ede300d123"
+        },
+        "rollout_metadata": {
+          "path": "outputs/tables/r3_2_rollout/r3_2_rollout_unseen_pr_seed42_metadata.json",
+          "sha256": "fe6d3e5426a7f3ba8bbd63c910550b831d6d2b196ea5037a3cea8918db29b4a6"
+        },
+        "physics_summary": {
+          "path": "outputs/tables/r3_2_physics/r3_2_physics_unseen_pr_seed42_summary_h1_h4_h8_h16.csv",
+          "sha256": "8abd1724192d139c499b93c7d712a6ee956554c3b15eacd6c7e37eb36c6e40d9"
+        },
+        "physics_differences": {
+          "path": "outputs/tables/r3_2_physics/r3_2_physics_unseen_pr_seed42_differences.csv",
+          "sha256": "fb81eae34912c7ca8bfd39d2938f9328ad27105fcf71b59e0c489f16ee03035c"
+        },
+        "physics_metadata": {
+          "path": "outputs/tables/r3_2_physics/r3_2_physics_unseen_pr_seed42_metadata.json",
+          "sha256": "c5a468fe0ea42b10373eca66b96923ee92c21fdc8fc713a04ee428724c9cec65"
+        }
+      }
+    },
+    "unseen_ra": {
+      "validation": {
+        "R3-2a": {
+          "best_epoch": 6,
+          "best_val_loss": 0.1865624729210117,
+          "checkpoint": "checkpoints/r3_2/r3_2a_paramonly_h4_unseen_ra_best.pth",
+          "checkpoint_sha256": "c7eeb2de53cbf0eaef7e25c14ec733f1dce4f9da2d0a4dc66df6214a6ec044fb"
+        },
+        "R3-2b": {
+          "best_epoch": 19,
+          "best_val_loss": 0.18654042271409838,
+          "checkpoint": "checkpoints/r3_2/r3_2b_stateparam_h4_unseen_ra_best.pth",
+          "checkpoint_sha256": "fc64be2ba2b19fa27469c992391a4dcf41133a9a32c965e17b97f15e371c6b39"
+        },
+        "R3-1b": {
+          "best_val_loss": 0.18668615653790455
+        }
+      },
+      "rollout_test": {
+        "global_rel_l2_percent": {
+          "R3-1b-Canonical": {
+            "1": 14.075811564588648,
+            "4": 24.618574910754933,
+            "8": 32.10120900072428,
+            "16": 44.83821599270369
+          },
+          "R3-2a-ParamOnly": {
+            "1": 14.068818598991466,
+            "4": 24.618916528055564,
+            "8": 32.10236900394963,
+            "16": 44.83606814537428
+          },
+          "R3-2b-StateParam": {
+            "1": 14.069135158173088,
+            "4": 24.619453189984817,
+            "8": 32.10256735991584,
+            "16": 44.83632815892767
+          }
+        },
+        "global_auc_trapz": {
+          "R3-1b-Canonical": 483.1244793749557,
+          "R3-2a-ParamOnly": 483.1184023649879,
+          "R3-2b-StateParam": 483.12273885628207
+        },
+        "primary_global_difference_pp": {
+          "1": 0.0003165591816216,
+          "4": 0.000536661929253,
+          "8": 0.000198355966205,
+          "16": 0.0002600135533938
+        }
+      },
+      "gate_diagnostics": {
+        "R3-2a-ParamOnly": {
+          "1": {
+            "alpha_advection_mean": 0.021786855533719,
+            "alpha_advection_std": 9.440203077017176e-07,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9997546597531244,
+            "alpha_advection_sat99_fraction": 1.0,
+            "alpha_forcing_mean": 7.795602262679798e-06,
+            "alpha_forcing_std": 6.777952519156735e-08,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.6468964922288853,
+            "alpha_forcing_sat99_fraction": 0.0
+          },
+          "4": {
+            "alpha_advection_mean": 0.021786855533719,
+            "alpha_advection_std": 9.440203077017176e-07,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9997546597531244,
+            "alpha_advection_sat99_fraction": 1.0,
+            "alpha_forcing_mean": 7.795602262679798e-06,
+            "alpha_forcing_std": 6.777952519156735e-08,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.6468964922288853,
+            "alpha_forcing_sat99_fraction": 0.0
+          },
+          "8": {
+            "alpha_advection_mean": 0.021786855533719,
+            "alpha_advection_std": 9.440203077017176e-07,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9997546597531244,
+            "alpha_advection_sat99_fraction": 1.0,
+            "alpha_forcing_mean": 7.795602262679798e-06,
+            "alpha_forcing_std": 6.777952519156735e-08,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.6468964922288853,
+            "alpha_forcing_sat99_fraction": 0.0
+          },
+          "16": {
+            "alpha_advection_mean": 0.021786855533719,
+            "alpha_advection_std": 9.440203077017176e-07,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9997546597531244,
+            "alpha_advection_sat99_fraction": 1.0,
+            "alpha_forcing_mean": 7.795602262679798e-06,
+            "alpha_forcing_std": 6.777952519156735e-08,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.6468964922288853,
+            "alpha_forcing_sat99_fraction": 0.0
+          }
+        },
+        "R3-2b-StateParam": {
+          "1": {
+            "alpha_advection_mean": 0.0208703367790751,
+            "alpha_advection_std": 0.0013032222207341,
+            "alpha_advection_mean_abs_capacity_ratio": 0.957697470991378,
+            "alpha_advection_sat99_fraction": 0.551440329218107,
+            "alpha_forcing_mean": 1.106438535185559e-05,
+            "alpha_forcing_std": 1.1408774450484458e-06,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.9181474158897812,
+            "alpha_forcing_sat99_fraction": 0.3744855967078189
+          },
+          "4": {
+            "alpha_advection_mean": 0.0208953020703277,
+            "alpha_advection_std": 0.0012963127990021,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9588430776266834,
+            "alpha_advection_sat99_fraction": 0.5703703703703704,
+            "alpha_forcing_mean": 1.109355845212361e-05,
+            "alpha_forcing_std": 1.136390545779606e-06,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.9205682649268307,
+            "alpha_forcing_sat99_fraction": 0.388477366255144
+          },
+          "8": {
+            "alpha_advection_mean": 0.0209459014988117,
+            "alpha_advection_std": 0.0012848950020004,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9611649828841652,
+            "alpha_advection_sat99_fraction": 0.6119341563786008,
+            "alpha_forcing_mean": 1.1153665391734627e-05,
+            "alpha_forcing_std": 1.1293202918328936e-06,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.9255560730631084,
+            "alpha_forcing_sat99_fraction": 0.4213991769547325
+          },
+          "16": {
+            "alpha_advection_mean": 0.0210651853148645,
+            "alpha_advection_std": 0.0012207149886622,
+            "alpha_advection_mean_abs_capacity_ratio": 0.9666386755309706,
+            "alpha_advection_sat99_fraction": 0.7065843621399177,
+            "alpha_forcing_mean": 1.12898251660945e-05,
+            "alpha_forcing_std": 1.0934315818810412e-06,
+            "alpha_forcing_mean_abs_capacity_ratio": 0.9368549153395735,
+            "alpha_forcing_sat99_fraction": 0.522633744855967
+          }
+        }
+      },
+      "physics_test": {
+        "primary_key_metric_differences": {
+          "1": {
+            "adv_b_rel_l2_percent_diff": 0.0007253842022407,
+            "r_b_normalized_mismatch_diff": 1.8224198517158285e-05,
+            "div_error_mae_diff": -1.316693282182868e-08,
+            "vorticity_rel_l2_percent_diff": 9.609354066242304e-06
+          },
+          "4": {
+            "adv_b_rel_l2_percent_diff": -0.0004280871087587,
+            "r_b_normalized_mismatch_diff": 6.5059276159740165e-06,
+            "div_error_mae_diff": -8.79518033541915e-07,
+            "vorticity_rel_l2_percent_diff": 9.270223831947531e-05
+          },
+          "8": {
+            "adv_b_rel_l2_percent_diff": -0.0010829816044832,
+            "r_b_normalized_mismatch_diff": 2.647982751957656e-07,
+            "div_error_mae_diff": -1.9898561695042005e-06,
+            "vorticity_rel_l2_percent_diff": 6.923049447493668e-05
+          },
+          "16": {
+            "adv_b_rel_l2_percent_diff": -0.0011857471271952,
+            "r_b_normalized_mismatch_diff": -6.553802134212639e-06,
+            "div_error_mae_diff": -4.973040412969976e-06,
+            "vorticity_rel_l2_percent_diff": -0.0003659292917603
+          }
+        }
+      },
+      "evidence_files": {
+        "rollout_summary": {
+          "path": "outputs/tables/r3_2_rollout/r3_2_rollout_unseen_ra_seed42_summary.csv",
+          "sha256": "74ac32605df4eaca0c8bbef89089a63c18baaed4e50d3f759cf4911cd66c93dc"
+        },
+        "rollout_growth": {
+          "path": "outputs/tables/r3_2_rollout/r3_2_rollout_unseen_ra_seed42_global_growth_auc.csv",
+          "sha256": "561d52cb3f09e8bf0f38c76fab9217ea0c7d9299bf6858233ca2c2704c323896"
+        },
+        "rollout_gates": {
+          "path": "outputs/tables/r3_2_rollout/r3_2_rollout_unseen_ra_seed42_gate_curve.csv",
+          "sha256": "fcb16cedce87f98219af0743239d41fb0fc0c0074b5a5811d5878a47e9b0349d"
+        },
+        "rollout_differences": {
+          "path": "outputs/tables/r3_2_rollout/r3_2_rollout_unseen_ra_seed42_differences.csv",
+          "sha256": "25a568201d7e1e8e950e7677bb5e6ac3d2fc6bc8ad7249ed1e18436934b6d656"
+        },
+        "rollout_metadata": {
+          "path": "outputs/tables/r3_2_rollout/r3_2_rollout_unseen_ra_seed42_metadata.json",
+          "sha256": "8eb34679b2a20a210f367d473f43443bff5875bbb470047bb049800f8b86c04c"
+        },
+        "physics_summary": {
+          "path": "outputs/tables/r3_2_physics/r3_2_physics_unseen_ra_seed42_summary_h1_h4_h8_h16.csv",
+          "sha256": "08c108e1de435fba743b9bd6a8ba434dc7028817723e6a945730780ef86b8fbc"
+        },
+        "physics_differences": {
+          "path": "outputs/tables/r3_2_physics/r3_2_physics_unseen_ra_seed42_differences.csv",
+          "sha256": "8e6259b7fd653dbfea8f5a52d0536aaa374163fa4a6a47e5879efec0d7c0bab4"
+        },
+        "physics_metadata": {
+          "path": "outputs/tables/r3_2_physics/r3_2_physics_unseen_ra_seed42_metadata.json",
+          "sha256": "ae282470c56a09f8fe6e6ff67921c04b47410dcc895d6e587d8c194a1e385f26"
+        }
+      }
+    }
+  },
+  "cross_split_closeout": {
+    "validation": "StateParam is numerically indistinguishable from ParamOnly on unseen-Pr VAL and slightly better on unseen-Ra VAL.",
+    "formal_rollout_test": "StateParam is numerically indistinguishable from ParamOnly on unseen-Pr TEST and slightly worse at all four reported horizons on unseen-Ra TEST.",
+    "gate_mechanism": "unseen-Pr adaptive gates are effectively capacity-saturated; unseen-Ra StateParam shows genuine sample/state-dependent gate variation distinct from ParamOnly.",
+    "formal_physics_test": "unseen-Pr physics differences are negligible and mixed; unseen-Ra shows small improvements for some mid/long-horizon physics proxies but not a consistent cross-metric benefit.",
+    "final_decision": "R3-2 CLOSED — MIXED",
+    "primary_causal_decision": "Current-state information value under the frozen continuous gate-strength formulation is NOT SUPPORTED.",
+    "transition": "Proceed to R3-3 as a separate causal stage testing utility/state-selective trust, without retroactively redesigning or retuning R3-2."
+  }
+}

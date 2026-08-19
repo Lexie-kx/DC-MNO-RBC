@@ -1,0 +1,83 @@
+{
+  "stage": "R3-3A",
+  "registry_role": "FORMAL_UTILITY_PREDICTABILITY_RESULT_FREEZE",
+  "status": "FORMAL_PREDICTABILITY_COMPLETE",
+
+  "implementation_freeze": {
+    "commit": "d8e8fbb603c6a890bc4cc4ea72c317300c6aeec4",
+    "source_path": "evaluation/audit_r3_3a_predictability.py",
+    "source_sha256": "3b9de522bb462746a3071bf27508e1e3896f4b8a9a3a2a5820aa5d6108848da7",
+    "registry_path": "configs/r3/r3_3a_predictability_freeze_registry.json",
+    "registry_sha256": "5344329a7a1301147cebc260c723bc1d33d9e19c44bf2fe4765cd56a5c651eed"
+  },
+
+  "formal_protocol": {
+    "seed": 42,
+    "epochs": 100,
+    "batch_size": 512,
+    "optimizer": "Adam",
+    "learning_rate": 0.001,
+    "loss": "BCEWithLogitsLoss",
+    "classifier_parameters": 897,
+    "train_only_fit": true,
+    "val_role": "diagnostic AUC only",
+    "val_model_selection": false,
+    "val_threshold_tuning": false,
+    "val_temperature_tuning": false,
+    "test_accessed": false
+  },
+
+  "unseen_pr": {
+    "buoyancy_advection": {
+      "paramutility_val_auc": 0.6689523397232617,
+      "stateutility_val_auc": 0.9038542790087025,
+      "state_minus_param_auc": 0.2349019392854408,
+
+      "paramutility_checkpoint_sha256": "d39dc21919d92d3519c2b96453ed7b80520bdff2ef81dab013bfdc56a0412260",
+      "stateutility_checkpoint_sha256": "ce3d223f56413760128cbe350c8386a2856b19ae956bc989d66140b623910575"
+    },
+
+    "buoyancy_forcing": {
+      "paramutility_val_auc": 0.5579620891208038,
+      "stateutility_val_auc": 0.9350185078844605,
+      "state_minus_param_auc": 0.3770564187636567,
+
+      "paramutility_checkpoint_sha256": "83137d966d091a0c87fee660d6a6a0530d2110347236b8cfe4886b4acf338b79",
+      "stateutility_checkpoint_sha256": "96749f37e4e99f62c684d1f8a10c36aa0c5721683e5af6086b956ba4279a00a0"
+    },
+
+    "summary_csv_sha256": "fc5295f2513e152bd33230a0863fff8368c0a6b8687e004a0672a5df830d45ec",
+    "summary_json_sha256": "a051799dea6b4f93efda5c4835492f9293cf22e689c8a78741bcebedf954c51c"
+  },
+
+  "unseen_ra": {
+    "buoyancy_advection": {
+      "paramutility_val_auc": 0.7645119586296056,
+      "stateutility_val_auc": 0.9335959875247123,
+      "state_minus_param_auc": 0.1690840288951067,
+
+      "paramutility_checkpoint_sha256": "9fd97fbd836c245fe14972690b7cca60999c534d96e12bee12fb6b5bceb449f9",
+      "stateutility_checkpoint_sha256": "7fe62ef16e99fd39531e84d543cbdb5b2d2e86de3847fabd3efb8e1d3afc4bad"
+    },
+
+    "buoyancy_forcing": {
+      "paramutility_val_auc": 0.6233199953328438,
+      "stateutility_val_auc": 0.9108429021475782,
+      "state_minus_param_auc": 0.2875229068147344,
+
+      "paramutility_checkpoint_sha256": "d5482976e7327fc6f47e3f26e5629013e304ac557ccaf774f6b480538a6ae057",
+      "stateutility_checkpoint_sha256": "3bc8809604d9f999fbbe21f0b466473c096392fa15c7792ef28b72f6ddc8d220"
+    },
+
+    "summary_csv_sha256": "54321dca54ceb932942ac5d5c308f8eb0864980cff8815f7b4e355cbcdfd677d",
+    "summary_json_sha256": "d782f25df2bbb1cdef4655694585f223ce96f09df1c9ecc434460cca683b7cfd"
+  },
+
+  "formal_interpretation": {
+    "stateutility_exceeds_paramutility_comparisons": 4,
+    "total_primary_comparisons": 4,
+    "result": "SUPPORTED",
+    "claim_scope": "current-state information improves per-term Utility predictability",
+    "does_not_claim": "closed-loop rollout superiority"
+  }
+}

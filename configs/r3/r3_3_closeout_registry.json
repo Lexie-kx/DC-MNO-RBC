@@ -1,0 +1,101 @@
+{
+  "stage": "R3-3",
+  "registry_role": "FORMAL_CLOSEOUT",
+  "status": "CLOSED",
+
+  "core_question": "Does current-state information provide value specifically for Utility/state selection under a frozen dimension-valid PDE-structured parent?",
+
+  "formal_conclusions": {
+    "utility_predictability": {
+      "decision": "SUPPORTED",
+      "scope": "Current-state information improves per-term Utility predictability across unseen-Pr and unseen-Ra."
+    },
+
+    "closed_loop_prediction": {
+      "decision": "PASS",
+      "scope": "StateUtility yields small but consistent closed-loop predictive gains over matched ParamUtility on both unseen parameter axes."
+    },
+
+    "final_candidate_vs_r3_2a": {
+      "decision": "PASS",
+      "scope": "StateUtility has lower global rollout AUC than the strongest matched R3-2a ParamOnly control on both unseen-Pr and unseen-Ra."
+    },
+
+    "physical_consistency": {
+      "decision": "NOT_CONSISTENTLY_SUPPORTED",
+      "scope": "State-selective Utility does not consistently improve the predeclared FD-based physics proxies.",
+      "unseen_pr_key_metric_horizon_wins": "2/16",
+      "unseen_ra_key_metric_horizon_wins": "7/16",
+      "overall_key_metric_horizon_wins": "9/32",
+      "divergence_wins": "0/8",
+      "interpretation": "Localized pathway-specific improvements occur, particularly for buoyancy-related proxies under unseen-Ra, but global physical-consistency improvements are not supported."
+    }
+  },
+
+  "prediction_auc": {
+    "unseen_pr": {
+      "ParamUtility": 304.888008,
+      "StateUtility": 304.792810,
+      "StateMinusParam": -0.095198,
+      "R3_2a_ParamOnly": 304.873939,
+      "StateUtilityMinusR3_2a": -0.081129
+    },
+
+    "unseen_ra": {
+      "ParamUtility": 483.120298,
+      "StateUtility": 483.045000,
+      "StateMinusParam": -0.075298,
+      "R3_2a_ParamOnly": 483.118402,
+      "StateUtilityMinusR3_2a": -0.073402
+    }
+  },
+
+  "mechanistic_interpretation": {
+    "supported": "Current-state information is useful for deciding whether/when a dimension-valid physical pathway should be trusted for predictive utility.",
+    "not_supported": "Current-state information does not demonstrate consistent improvement of overall physical consistency under the present prediction-error-defined Utility target.",
+    "key_distinction": "predictive Utility is not equivalent to physical Utility"
+  },
+
+  "claim_boundary": {
+    "dimension_validity": "SUPPORTED by prior R1/R2/R3-1 evidence",
+    "state_selective_predictive_utility": "SUPPORTED",
+    "state_selective_physical_consistency": "NOT CONSISTENTLY SUPPORTED",
+    "solver_level_pde_satisfaction_claim": false,
+    "statistical_significance_claim": false
+  },
+
+  "limitations": [
+    "single seed 42",
+    "closed-loop predictive effect size is small",
+    "Utility supervision is defined from prediction error rather than physics consistency",
+    "physics metrics are FD-based comparative proxies rather than solver-level PDE residual truth"
+  ],
+
+  "frozen_prediction_evidence": {
+    "pretest_freeze_commit": "247f49db4655b430d5142c2bbcd26f28c1acf611",
+    "rollout_result_freeze_commit": "2c501a98559271c69e8fa4be087dea6c41754820",
+    "formal_rollout_registry_sha256": "ba13abfc77e91fa153b93a64a3c5d2ca390047c6f2f6a0bcbb1b2a86ae89dd2a"
+  },
+
+  "frozen_physics_evidence": {
+    "physics_pretest_freeze_commit": "dda72ff01572a61443e1edba64c21a14c53864db",
+    "physics_evaluator_sha256": "6e55edeee8a166f6613b845c3fe5743a4a218a86883d7e3dc394bb099533d6c9",
+    "physics_pretest_registry_sha256": "2ee9e2fc4c0c9c165c015722d28a0e4eb93d8bf9645c04bda98554d75a2e6282",
+
+    "unseen_pr": {
+      "summary_sha256": "9cb3aebbf253b70b3a18d62ff4d91857fb1d5e247fb84d6809262c4b3526912d",
+      "differences_sha256": "1af18456f188efa8de8168de4cd4bf2b88ebc7efbf1b40746cb4f39008a49f76",
+      "metadata_sha256": "7d64cba105bd2a72561a359629fd10c3baa0c2f97dfd96449e66c54b54408d5d"
+    },
+
+    "unseen_ra": {
+      "summary_sha256": "445b504f94a6d849a800144cf9c1394da25b5fb2ee6cce7b2baf031b796eddab",
+      "differences_sha256": "af5d643ef4b313ff2e26ed1697a5b6a18f729bd7f6c417e0a9c041fbd493b120",
+      "metadata_sha256": "2e51bb5bfb98998b515a5a33a43b9e1b595ef8e8d4aeb4598b8842d280ff5b5a"
+    }
+  },
+
+  "overall_closeout": "R3-3 CLOSED — STATE-SELECTIVE PREDICTIVE UTILITY SUPPORTED; PHYSICAL-CONSISTENCY BENEFIT NOT CONSISTENTLY SUPPORTED",
+
+  "next_stage_implication": "R4 should preserve the dimension-valid and state-selective predictive mechanism while explicitly addressing the gap between predictive Utility and physical Utility; physics results must not be retrospectively used to redesign or reinterpret the frozen R3-3 prediction experiment."
+}

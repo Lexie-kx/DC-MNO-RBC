@@ -1,0 +1,128 @@
+{
+  "stage": "R3-3A",
+  "registry_role": "FORMAL_UTILITY_DATASET_FREEZE",
+  "status": "FORMAL_TRAIN_VAL_DATA_COMPLETE",
+
+  "generator_freeze": {
+    "commit": "7963c0934aa49aa26b410f32829bc306f8d48ed5",
+    "generator_path": "evaluation/audit_r3_3a_utility_targets.py",
+    "generator_sha256": "a9a8cb12257e8d86b36ceeaf805878f2420f191ce8e553b6e237215ed325adcd",
+    "generator_registry_path": "configs/r3/r3_3a_generator_freeze_registry.json",
+    "generator_registry_sha256": "414c0cd6bea30388be196b6e2348a28155961c32ed16d7ab7d8aa9ca9dc194e5"
+  },
+
+  "formal_protocol": {
+    "seed": 42,
+    "batch_size": 4,
+    "rollout_horizon": 4,
+    "steps": [1, 2, 3, 4],
+    "terms": [
+      "buoyancy_advection",
+      "buoyancy_forcing"
+    ],
+    "rows_per_window": 8,
+    "parent_inference_dtype": "float32",
+    "utility_error_accumulation_dtype": "float64",
+    "help_rule": "gain > 0",
+    "test_accessed": false
+  },
+
+  "datasets": {
+    "unseen_pr_train": {
+      "data_split": "train",
+      "windows": 4464,
+      "rows": 35712,
+
+      "rows_path": "outputs/tables/r3_3_utility/r3_3a_utility_unseen_pr_train_seed42_rows.csv",
+      "rows_sha256": "273d226c4743d25fdc230a991ebdb209fe3bc086b7ec14dcf18983aca4531cc8",
+
+      "summary_path": "outputs/tables/r3_3_utility/r3_3a_utility_unseen_pr_train_seed42_summary.csv",
+      "summary_sha256": "49b417e6d8a94177a9a5ac8fbffacefe939c462e56a9351ee0c75ce7b7f228ea",
+
+      "metadata_path": "outputs/tables/r3_3_utility/r3_3a_utility_unseen_pr_train_seed42_metadata.json",
+      "metadata_sha256": "8a168f3cf8e39f8c88fa4b1e3e8cf43c17700565b51de92f3f44fb690f6dfbbc",
+
+      "label_prevalence": {
+        "buoyancy_advection": 0.665379,
+        "buoyancy_forcing": 0.712982
+      }
+    },
+
+    "unseen_pr_val": {
+      "data_split": "val",
+      "windows": 558,
+      "rows": 4464,
+
+      "rows_path": "outputs/tables/r3_3_utility/r3_3a_utility_unseen_pr_val_seed42_rows.csv",
+      "rows_sha256": "17a7126e1150d850acedbe076695644e6d292c35f186676290903ba06c0e48cd",
+
+      "summary_path": "outputs/tables/r3_3_utility/r3_3a_utility_unseen_pr_val_seed42_summary.csv",
+      "summary_sha256": "ce178eec1eeba306bc5363357db23c14f4250d93a4650c75567a40f5c4479a07",
+
+      "metadata_path": "outputs/tables/r3_3_utility/r3_3a_utility_unseen_pr_val_seed42_metadata.json",
+      "metadata_sha256": "fae100ec80550e9a1dbcaaf0528b84abdd5d9545a6421de3054e180a5091b047",
+
+      "label_prevalence": {
+        "buoyancy_advection": 0.693996,
+        "buoyancy_forcing": 0.681452
+      }
+    },
+
+    "unseen_ra_train": {
+      "data_split": "train",
+      "windows": 4464,
+      "rows": 35712,
+
+      "rows_path": "outputs/tables/r3_3_utility/r3_3a_utility_unseen_ra_train_seed42_rows.csv",
+      "rows_sha256": "1831b9b9204f336ab17d79ff38b51307c9e9fa3859e40bcaff8206e77a64c79c",
+
+      "summary_path": "outputs/tables/r3_3_utility/r3_3a_utility_unseen_ra_train_seed42_summary.csv",
+      "summary_sha256": "370cd60341facfef8ca7ace5f249ba2579ee805234ff0520a92e79fa62a7cf50",
+
+      "metadata_path": "outputs/tables/r3_3_utility/r3_3a_utility_unseen_ra_train_seed42_metadata.json",
+      "metadata_sha256": "01f8dfab44545b99499c40ef033fd594a245ff70528895e9e808bc9342c4f6a1",
+
+      "label_prevalence": {
+        "buoyancy_advection": 0.662914,
+        "buoyancy_forcing": 0.694556
+      }
+    },
+
+    "unseen_ra_val": {
+      "data_split": "val",
+      "windows": 558,
+      "rows": 4464,
+
+      "rows_path": "outputs/tables/r3_3_utility/r3_3a_utility_unseen_ra_val_seed42_rows.csv",
+      "rows_sha256": "71a0787041876516155ebcdd87c804b2cc8aef40c5de259238563a8bf15f1533",
+
+      "summary_path": "outputs/tables/r3_3_utility/r3_3a_utility_unseen_ra_val_seed42_summary.csv",
+      "summary_sha256": "03d60db624d9ff3c64e150ee5e676898afa330a2eef723f386104906ca7028b6",
+
+      "metadata_path": "outputs/tables/r3_3_utility/r3_3a_utility_unseen_ra_val_seed42_metadata.json",
+      "metadata_sha256": "be398a5ad6857dbbf3718534c273affbb459aa235dfc5538f5f8be4ad9926951",
+
+      "label_prevalence": {
+        "buoyancy_advection": 0.693100,
+        "buoyancy_forcing": 0.822133
+      }
+    }
+  },
+
+  "downstream_predictability_policy": {
+    "classifier_fit_data": "TRAIN rows only",
+    "classifier_feature_normalization": "TRAIN only",
+    "val_role": "diagnostic AUC only",
+    "val_model_selection": false,
+    "val_threshold_tuning": false,
+    "val_temperature_tuning": false,
+    "test_access": false,
+
+    "matched_arms": [
+      "ParamUtility",
+      "StateUtility"
+    ],
+
+    "primary_question": "Does current-state information improve Utility predictability beyond the capacity-matched parameter-only control?"
+  }
+}

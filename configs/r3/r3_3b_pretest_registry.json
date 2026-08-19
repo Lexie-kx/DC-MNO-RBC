@@ -1,0 +1,106 @@
+{
+  "stage": "R3-3B",
+  "registry_role": "CLOSED_LOOP_UTILITY_GATING_PRETEST_FREEZE",
+  "registry_status": "LOCKED_BEFORE_FORMAL_TEST",
+
+  "primary_formal_contrast": {
+    "comparison": "R3-3B-b-StateUtility - R3-3B-a-ParamUtility",
+    "interpretation": "incremental value of current-state information specifically for Utility/state selection",
+    "negative_global_rollout_difference_means": "StateUtility better",
+    "primary_metric": "global rollout AUC over h1..h16"
+  },
+
+  "frozen_evaluator": {
+    "path": "evaluation/evaluate_cross_param_rollout_r3_3.py",
+    "sha256": "104e3db55561368d961865c16bda385717b3fb1cdbda1e4be3dafc8fe9800987"
+  },
+
+  "upstream_freezes": {
+    "r3_3_contract_sha256": "426299fcce724d1e74490887c39ea58307f2180bf464c4d41ee6ee170b6c4af8",
+    "r3_2_closeout_registry_sha256": "45013b8d2c960e13419b02578f10af621b7d59917c33a95be66925a00622ca5c",
+    "r3_3a_formal_predictability_registry_path": "configs/r3/r3_3a_formal_predictability_registry.json",
+    "r3_3a_formal_predictability_registry_sha256": "c82513a785263083d4aed2bd9a767c0ef7bbb242ccb2f1d70e3b82eb276acfd1",
+    "r3_3a_formal_predictability_freeze_commit": "aa559685a466d80d8e2964439ba51475084c9ac6"
+  },
+
+  "formal_protocol": {
+    "seed": 42,
+    "batch_size": 4,
+    "reported_horizons": [1, 4, 8, 16],
+    "full_max_horizon": 16,
+    "window_policy": "all legal TEST windows, stride 1",
+    "formal_test_windows_per_split": 2430,
+    "rollout": "free autoregressive",
+    "metric_space": "denormalized physical/field-value space",
+    "utility_gate": "soft sigmoid probability",
+    "threshold_tuning": false,
+    "temperature_tuning": false,
+    "special_step1_rule": false,
+    "neural_operator_retraining": false,
+    "test_accessed_before_freeze": false
+  },
+
+  "utility_inference_semantics": {
+    "parent": "frozen split-matched R3-2b StateParam",
+    "formula": "base_delta_norm + q_adv * term_correction_adv + q_force * term_correction_force",
+    "term_correction_semantics": "effective_alpha * canonical normalized finite-step PDE signal",
+    "alpha_is_not_multiplied_twice": true,
+    "feature_source": "R3-2b full_conditioner_features",
+    "feature_dim": 10,
+    "normalization": "frozen TRAIN-only feature_mean/feature_std from corresponding R3-3A formal classifier checkpoint",
+    "normalization_order": "normalize full 10D first, then apply ParamUtility state mask",
+    "classifier_input_dtype": "float32",
+    "paramutility_mask": "normalized dims 0..7 exact zero; dims 8..9 retained",
+    "stateutility_input": "all normalized 10D features",
+    "q_definition": "sigmoid(frozen classifier logit)"
+  },
+
+  "formal_checkpoints": {
+    "unseen_pr": {
+      "r3_2b_parent_sha256": "9e5697a214a09c554e91c326047fc75e5b3a8f99e3fee99c48e9e9673b7a067a",
+
+      "buoyancy_advection_paramutility_sha256": "d39dc21919d92d3519c2b96453ed7b80520bdff2ef81dab013bfdc56a0412260",
+      "buoyancy_advection_stateutility_sha256": "ce3d223f56413760128cbe350c8386a2856b19ae956bc989d66140b623910575",
+
+      "buoyancy_forcing_paramutility_sha256": "83137d966d091a0c87fee660d6a6a0530d2110347236b8cfe4886b4acf338b79",
+      "buoyancy_forcing_stateutility_sha256": "96749f37e4e99f62c684d1f8a10c36aa0c5721683e5af6086b956ba4279a00a0"
+    },
+
+    "unseen_ra": {
+      "r3_2b_parent_sha256": "fc64be2ba2b19fa27469c992391a4dcf41133a9a32c965e17b97f15e371c6b39",
+
+      "buoyancy_advection_paramutility_sha256": "9fd97fbd836c245fe14972690b7cca60999c534d96e12bee12fb6b5bceb449f9",
+      "buoyancy_advection_stateutility_sha256": "7fe62ef16e99fd39531e84d543cbdb5b2d2e86de3847fabd3efb8e1d3afc4bad",
+
+      "buoyancy_forcing_paramutility_sha256": "d5482976e7327fc6f47e3f26e5629013e304ac557ccaf774f6b480538a6ae057",
+      "buoyancy_forcing_stateutility_sha256": "3bc8809604d9f999fbbe21f0b466473c096392fa15c7792ef28b72f6ddc8d220"
+    }
+  },
+
+  "audit_only_status": {
+    "unseen_pr": {
+      "passed": true,
+      "test_dataset_constructed": false,
+      "test_accessed": false
+    },
+    "unseen_ra": {
+      "passed": true,
+      "test_dataset_constructed": false,
+      "test_accessed": false
+    }
+  },
+
+  "forbidden_after_freeze": [
+    "changing Utility features",
+    "changing ParamUtility mask",
+    "changing StateUtility visibility",
+    "changing classifier checkpoints",
+    "changing q threshold or temperature",
+    "special-casing step 1",
+    "retraining the neural operator",
+    "changing the R3-2b parent",
+    "changing canonical PDE terms",
+    "changing alpha semantics",
+    "TEST-driven redesign"
+  ]
+}

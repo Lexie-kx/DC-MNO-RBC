@@ -1,0 +1,258 @@
+{
+  "stage": "R3-3",
+  "title": "Per-Term State-Selective Utility Coupling",
+  "status": "ARCHITECTURE_AND_CAUSAL_CONTRACT_FROZEN_BEFORE_R3_3_RESULTS",
+  "method_role": {
+    "R3-3A": "AUDIT_CONTROL_UTILITY_TARGET_AND_PREDICTABILITY",
+    "R3-3B-a": "CAPACITY_MATCHED_PARAMUTILITY_CONTROL",
+    "R3-3B-b": "FORMAL_STATEUTILITY_MAIN_CANDIDATE",
+    "distance_to_core_method_after_R3-3A": "one_matched_intervention_stage",
+    "distance_to_core_method_after_R3-3B-b_if_pass": "core_architecture_complete_R4_validation_remains"
+  },
+  "frozen_parent": {
+    "model": "R3-2b-StateParam",
+    "closeout_commit": "1104410",
+    "closeout_registry": "configs/r3/r3_2_closeout_registry.json",
+    "closeout_registry_sha256": "45013b8d2c960e13419b02578f10af621b7d59917c33a95be66925a00622ca5c",
+    "unseen_pr_checkpoint": "checkpoints/r3_2/r3_2b_stateparam_h4_unseen_pr_best.pth",
+    "unseen_pr_checkpoint_sha256": "9e5697a214a09c554e91c326047fc75e5b3a8f99e3fee99c48e9e9673b7a067a",
+    "unseen_ra_checkpoint": "checkpoints/r3_2/r3_2b_stateparam_h4_unseen_ra_best.pth",
+    "unseen_ra_checkpoint_sha256": "fc64be2ba2b19fa27469c992391a4dcf41133a9a32c965e17b97f15e371c6b39"
+  },
+  "active_terms": {
+    "buoyancy_advection": {
+      "canonical_term": "-u dot grad(b)",
+      "target_field": "buoyancy",
+      "utility_gate": "q_adv"
+    },
+    "buoyancy_forcing": {
+      "canonical_term": "b",
+      "target_field": "u_y",
+      "utility_gate": "q_force"
+    }
+  },
+  "utility_target": {
+    "definition": "per-term one-step marginal predictive utility from the exact same frozen R3-2b rollout state",
+    "parent_state": "single shared R3-2b autoregressive state S_t; counterfactual branches never maintain separate histories",
+    "full_prediction": "base + alpha_adv * P_adv_DC + alpha_force * P_force_DC",
+    "term_off_counterfactual": "from the same S_t, suppress only the audited term while every other parent component is unchanged",
+    "buoyancy_advection_target_field": "buoyancy",
+    "buoyancy_forcing_target_field": "u_y",
+    "target_error": "per-sample RMS error in the corresponding normalized target field",
+    "gain": "E_term_off_target - E_full_target",
+    "binary_help": "1 if gain > 0 else 0",
+    "relative_gain": "gain / (E_term_off_target + 1e-12)",
+    "rollout_advance_rule": "after labels are computed, advance only with the full frozen R3-2b parent prediction",
+    "term_off_branch_feedback": false,
+    "ground_truth_usage": "TRAIN/VAL utility-label construction only",
+    "ground_truth_as_inference_feature": false,
+    "future_as_inference_feature": false,
+    "test_labels_before_test_freeze": false
+  },
+  "gate_features": {
+    "dim": 10,
+    "source": "exact frozen R3-2 StateParam inference-visible interface",
+    "features": [
+      "b_mean_norm",
+      "b_rms_norm",
+      "ux_mean_norm",
+      "ux_rms_norm",
+      "uy_mean_norm",
+      "uy_rms_norm",
+      "log1p_canonical_buoyancy_advection_signal_rms",
+      "log1p_canonical_buoyancy_forcing_signal_rms",
+      "logRa",
+      "logPr"
+    ],
+    "state_source": "latest predicted autoregressive state",
+    "temporal_d1_d2_features": false,
+    "horizon_feature": false,
+    "pressure_extra_feature": false,
+    "train_fitted_feature_normalization": true,
+    "normalization_source": "TRAIN only"
+  },
+  "utility_classifier": {
+    "number_of_gates": 2,
+    "shared_architecture": true,
+    "shared_weights": false,
+    "architecture": "Linear(10,32)-GELU-Linear(32,16)-GELU-Linear(16,1)",
+    "parameters_per_gate": 897,
+    "total_utility_parameters": 1794,
+    "output": "sigmoid probability",
+    "loss": "BCEWithLogitsLoss",
+    "optimizer": "Adam",
+    "learning_rate": 0.001,
+    "epochs": 100,
+    "batch_size_max": 512,
+    "formal_seed": 42,
+    "validation_checkpoint_selection": false,
+    "threshold_tuning": false,
+    "temperature_tuning": false,
+    "formal_arms": [
+      "R3-3B-a_ParamUtility",
+      "R3-3B-b_StateUtility"
+    ],
+    "per_term_independent_classifiers": true,
+    "matched_initialization_across_arms": true,
+    "classifier_training_source": "TRAIN utility rows only",
+    "VAL_role": "diagnostic only; no checkpoint, feature, threshold, or architecture selection",
+    "TEST_role": "forbidden until classifier and intervention protocol are frozen"
+  },
+  "inference_rule": {
+    "step1_special_case": false,
+    "all_steps_use_same_gate_rule": true,
+    "q_adv": "sigmoid(f_adv(z_t))",
+    "q_force": "sigmoid(f_force(z_t))",
+    "final_delta": "base_delta + q_adv * alpha_adv * P_adv_DC + q_force * alpha_force * P_force_DC",
+    "hard_threshold_primary": false,
+    "soft_gate_primary": true,
+    "counterfactual_or_GT_needed_at_inference": false,
+    "ParamUtility_rule": "q_j = sigmoid(f_j(zeros_8, logRa, logPr))",
+    "StateUtility_rule": "q_j = sigmoid(f_j(state_features_8, logRa, logPr))"
+  },
+  "frozen_components": [
+    "M6 backbone",
+    "canonical metadata",
+    "Canonicalizer",
+    "Canonical PDE compiler",
+    "PDE sparse topology",
+    "R3-2b StateParam conditioner",
+    "parent raw_alpha",
+    "alpha_max_by_term"
+  ],
+  "forbidden_changes": [
+    "new PDE pathways",
+    "RMSCap",
+    "PDE loss",
+    "parent retraining",
+    "future or GT inference features",
+    "temporal d1/d2 features",
+    "horizon input",
+    "pressure extra features",
+    "VAL-selected threshold",
+    "TEST-driven redesign",
+    "arm-specific architecture tuning",
+    "changing Utility features after R3-3A AUC",
+    "choosing ParamUtility or StateUtility based on VAL",
+    "separate architecture sizes for ParamUtility and StateUtility",
+    "counterfactual branches feeding their states back into utility-row rollout",
+    "using GT to compute q at inference",
+    "special-casing step1 q=1"
+  ],
+  "R3-3A_protocol": {
+    "stage": "AUDIT_CONTROL",
+    "main_operator_training": false,
+    "parent": "frozen split-matched R3-2b",
+    "utility_row_generation": "TRAIN and VAL only",
+    "parent_rollout": "free-autoregressive H4",
+    "counterfactual_semantics": "same-state one-step per-term ablation; no counterfactual feedback",
+    "steps_used": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "classifier_arms": [
+      "ParamUtility",
+      "StateUtility"
+    ],
+    "classifier_training": "TRAIN only",
+    "VAL_role": "predictability diagnostic only",
+    "offline_AUC_selects_features": false,
+    "offline_AUC_selects_arm": false,
+    "architecture_changes_after_AUC": false,
+    "test_access": false
+  },
+  "R3-3B_protocol": {
+    "stage": "MATCHED_CAUSAL_INTERVENTION_AND_MAIN_CANDIDATE",
+    "arms": {
+      "R3-3B-a": "ParamUtility control",
+      "R3-3B-b": "StateUtility formal candidate"
+    },
+    "parent_training": false,
+    "utility_classifiers": "frozen after TRAIN-only fitting",
+    "gate_mode": "per-term soft probability",
+    "step1_special_case": false,
+    "rollout": "free autoregressive",
+    "reported_horizons": [
+      1,
+      4,
+      8,
+      16
+    ],
+    "VAL_threshold_tuning": false,
+    "VAL_temperature_tuning": false,
+    "formal_TEST_only_after_pretest_freeze": true
+  },
+  "causal_comparisons": {
+    "primary": {
+      "comparison": "R3-3B-b-StateUtility - R3-3B-a-ParamUtility",
+      "claim": "current-state information value specifically for Utility/state selection"
+    },
+    "secondary_parameter_utility": {
+      "comparison": "R3-3B-a-ParamUtility - R3-2b-StateParam",
+      "claim": "parameter-only Utility-selection value"
+    },
+    "secondary_total_utility": {
+      "comparison": "R3-3B-b-StateUtility - R3-2b-StateParam",
+      "claim": "total state-selective Utility value beyond continuous StateParam strength modulation"
+    },
+    "required_final_control": {
+      "comparison": "R3-3B-b-StateUtility - R3-2a-ParamOnly",
+      "claim": "final candidate performance relative to the strongest matched R3-2 adaptive control"
+    },
+    "context": {
+      "comparison": "R3-3B-b-StateUtility - R3-1b-Canonical",
+      "claim": "total adaptive plus Utility effect relative to static canonical coupling"
+    }
+  },
+  "decision_rule": {
+    "prediction_primary_metric": "global rollout AUC h1..16",
+    "primary_state_utility_PASS": "R3-3B-b AUC < R3-3B-a AUC on both unseen_pr and unseen_ra",
+    "primary_state_utility_MIXED": "R3-3B-b improves R3-3B-a on exactly one held-out axis",
+    "primary_state_utility_NOT_SUPPORTED": "R3-3B-b does not improve R3-3B-a on either held-out axis",
+    "total_utility_support": "reported separately from R3-3B-b versus frozen R3-2b",
+    "final_main_model_superiority": "requires R3-3B-b AUC < R3-2a AUC on both unseen_pr and unseen_ra",
+    "physics_role": "supportive mechanism evidence only; cannot override prediction decision",
+    "single_seed_statistical_significance_claim": false
+  },
+  "matched_utility_arms": {
+    "shared_parent": "frozen split-matched R3-2b StateParam",
+    "important_parent_semantics": "R3-2b state-conditioned alpha policy remains identical in both arms; only Utility-gate state visibility differs",
+    "R3-3B-a_ParamUtility": {
+      "role": "capacity-matched control",
+      "utility_gate_input_dim": 10,
+      "visible_inputs": [
+        "logRa",
+        "logPr"
+      ],
+      "masked_inputs": "features 0..7 are exact zeros",
+      "number_of_per_term_gates": 2,
+      "claim": "parameter-only Utility-selection value on top of the same frozen R3-2b parent"
+    },
+    "R3-3B-b_StateUtility": {
+      "role": "formal main candidate",
+      "utility_gate_input_dim": 10,
+      "visible_inputs": "all frozen R3-2 10D inference-visible state-plus-parameter features",
+      "masked_inputs": "none",
+      "number_of_per_term_gates": 2,
+      "claim": "state-plus-parameter Utility-selection value"
+    },
+    "capacity_matching": {
+      "same_architecture": true,
+      "same_parameter_count": true,
+      "same_feature_dimension": true,
+      "same_training_rows": true,
+      "same_labels": true,
+      "same_optimizer": true,
+      "same_epochs": true,
+      "same_batch_size": true,
+      "same_seed": true,
+      "same_deterministic_initialization": true,
+      "same_parent_checkpoint": true,
+      "same_PDE_terms": true,
+      "same_alpha_policy": true,
+      "only_difference": "whether current-state information is visible to the Utility classifiers"
+    }
+  }
+}

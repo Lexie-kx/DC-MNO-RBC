@@ -1,0 +1,133 @@
+{
+  "stage": "R3-3B",
+  "registry_role": "FORMAL_CLOSED_LOOP_UTILITY_GATING_RESULT_FREEZE",
+  "status": "FORMAL_ROLLOUT_COMPLETE",
+
+  "pretest_freeze": {
+    "commit": "247f49db4655b430d5142c2bbcd26f28c1acf611",
+    "evaluator_path": "evaluation/evaluate_cross_param_rollout_r3_3.py",
+    "evaluator_sha256": "104e3db55561368d961865c16bda385717b3fb1cdbda1e4be3dafc8fe9800987",
+    "pretest_registry_path": "configs/r3/r3_3b_pretest_registry.json",
+    "pretest_registry_sha256": "2c4e06cb5dd4face1de29c7a45e4fbf0b724b2bb63ed1e020393ea8545dad9cc"
+  },
+
+  "formal_protocol": {
+    "seed": 42,
+    "batch_size": 4,
+    "reported_horizons": [1, 4, 8, 16],
+    "full_max_horizon": 16,
+    "formal_test_windows_per_split": 2430,
+    "window_policy": "all legal TEST windows, stride 1",
+    "rollout": "free autoregressive",
+    "metric_space": "denormalized physical/field-value space",
+    "test_accessed": true
+  },
+
+  "primary_comparison": {
+    "comparison": "R3-3B-b-StateUtility - R3-3B-a-ParamUtility",
+    "metric": "global rollout AUC over h1..h16",
+    "negative_difference_means": "StateUtility better"
+  },
+
+  "unseen_pr": {
+    "global_rel_l2_percent": {
+      "ParamUtility": {
+        "h1": 7.245350,
+        "h4": 13.598558,
+        "h8": 19.453669,
+        "h16": 32.260930
+      },
+      "StateUtility": {
+        "h1": 7.234886,
+        "h4": 13.589785,
+        "h8": 19.446187,
+        "h16": 32.260622
+      },
+      "StateMinusParam": {
+        "h1": -0.010464,
+        "h4": -0.008773,
+        "h8": -0.007482,
+        "h16": -0.000308
+      }
+    },
+
+    "global_auc": {
+      "R3-1b-Canonical": 304.877933,
+      "R3-2a-ParamOnly": 304.873939,
+      "R3-2b-StateParam": 304.873957,
+      "R3-3B-a-ParamUtility": 304.888008,
+      "R3-3B-b-StateUtility": 304.792810
+    },
+
+    "primary_auc_difference_state_minus_paramutility": -0.095198,
+    "stateutility_minus_r3_2b_auc": -0.081147,
+    "stateutility_minus_r3_2a_auc": -0.081129,
+
+    "outputs": {
+      "growth_sha256": "d5135c4348046961c15f1d80c33d2d2a1389012679af3856816dc5e4f54093b5",
+      "summary_sha256": "2f8feeb0d4f2769a21a5946cd15300534aa03f3b51c45bfe5bbf0ec0a4caca68",
+      "metadata_sha256": "0238e674d45ff5698edbf9c74a48c3c9edb525c025ed85a955adac48495bc51e"
+    }
+  },
+
+  "unseen_ra": {
+    "global_rel_l2_percent": {
+      "ParamUtility": {
+        "h1": 14.071643,
+        "h4": 24.618913,
+        "h8": 32.101807,
+        "h16": 44.836850
+      },
+      "StateUtility": {
+        "h1": 14.070637,
+        "h4": 24.614629,
+        "h8": 32.095244,
+        "h16": 44.832708
+      },
+      "StateMinusParam": {
+        "h1": -0.001005,
+        "h4": -0.004284,
+        "h8": -0.006563,
+        "h16": -0.004141
+      }
+    },
+
+    "global_auc": {
+      "R3-1b-Canonical": 483.124479,
+      "R3-2a-ParamOnly": 483.118402,
+      "R3-2b-StateParam": 483.122739,
+      "R3-3B-a-ParamUtility": 483.120298,
+      "R3-3B-b-StateUtility": 483.045000
+    },
+
+    "primary_auc_difference_state_minus_paramutility": -0.075298,
+    "stateutility_minus_r3_2b_auc": -0.077739,
+    "stateutility_minus_r3_2a_auc": -0.073402,
+
+    "outputs": {
+      "growth_sha256": "e2005d85d5c4e778e4121ea5d25c1fc59b4774883b23b92a5a6e0cf5f503c7d0",
+      "summary_sha256": "f5e0748345ced7159859b65fab7c9b42788b8a889055b56e58d692527da5db16",
+      "metadata_sha256": "d7cd552e01a24ab0d0591c87215becb1dc31b86a1e69abe85e19f80f6da0508f"
+    }
+  },
+
+  "formal_decision": {
+    "stateutility_beats_paramutility_auc_axes": 2,
+    "total_axes": 2,
+    "reported_horizon_primary_differences_negative": 8,
+    "reported_horizon_primary_comparisons": 8,
+
+    "state_information_utility_value": "PASS",
+    "stateutility_beats_r3_2b_on_both_axes": true,
+    "stateutility_beats_r3_2a_on_both_axes": true,
+
+    "claim_scope": "current-state information for Utility/state selection yields small but consistent closed-loop predictive gains across both unseen parameter axes",
+
+    "limitations": [
+      "single seed 42",
+      "effect size is small",
+      "no statistical significance claim",
+      "physics evidence is not yet included in this registry"
+    ]
+  }
+}

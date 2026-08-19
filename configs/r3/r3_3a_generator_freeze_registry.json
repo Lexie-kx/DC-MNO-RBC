@@ -1,0 +1,151 @@
+{
+  "stage": "R3-3A",
+  "registry_role": "UTILITY_TARGET_GENERATOR_FREEZE",
+
+  "status": "PRE_FREEZE_AUDIT_PASS",
+
+  "generator": {
+    "path": "evaluation/audit_r3_3a_utility_targets.py",
+    "sha256": "a9a8cb12257e8d86b36ceeaf805878f2420f191ce8e553b6e237215ed325adcd"
+  },
+
+  "frozen_upstream_provenance": {
+    "r3_0_contract_sha256": "7ba1809042b2b97ed3c1ec7dab299337c339f54d57a913086db5fefbaedc79fe",
+    "r3_2_contract_sha256": "cb364218e812a74fa59ad4b7e303877850d43e142bba65a8ea22023471584efd",
+    "r3_2_closeout_registry_sha256": "45013b8d2c960e13419b02578f10af621b7d59917c33a95be66925a00622ca5c",
+    "r3_3_contract_sha256": "426299fcce724d1e74490887c39ea58307f2180bf464c4d41ee6ee170b6c4af8"
+  },
+
+  "split_matched_parent_checkpoints": {
+    "unseen_pr_r3_2b_stateparam_sha256": "9e5697a214a09c554e91c326047fc75e5b3a8f99e3fee99c48e9e9673b7a067a",
+    "unseen_ra_r3_2b_stateparam_sha256": "fc64be2ba2b19fa27469c992391a4dcf41133a9a32c965e17b97f15e371c6b39"
+  },
+
+  "utility_target_contract": {
+    "parent": "frozen split-matched R3-2b StateParam",
+    "rollout": "H4 free-autoregressive",
+    "steps": [1, 2, 3, 4],
+
+    "counterfactual_semantics": "same parent rollout state; suppress exactly one audited term; no counterfactual branch feedback",
+
+    "parent_rollout_feedback": "full frozen R3-2b prediction only",
+
+    "active_terms": [
+      "buoyancy_advection",
+      "buoyancy_forcing"
+    ],
+
+    "target_fields": {
+      "buoyancy_advection": "buoyancy",
+      "buoyancy_forcing": "u_y"
+    },
+
+    "error_space": "normalized target field",
+
+    "utility_gain": "E_term_off_target - E_full_target",
+
+    "help_label": "1 iff utility_gain > 0",
+
+    "relative_gain": "utility_gain / (E_term_off_target + 1e-12)",
+
+    "label_threshold": 0.0,
+    "threshold_tuning": false,
+
+    "parent_inference_dtype": "float32",
+    "utility_counterfactual_arithmetic_dtype": "float64",
+    "utility_error_accumulation_dtype": "float64",
+
+    "gt_usage": "TRAIN/VAL offline utility-label construction only",
+
+    "test_access": false
+  },
+
+  "feature_contract": {
+    "source": "exact R3-2b full_conditioner_features",
+    "dimension": 10,
+
+    "features": [
+      "state_b_mean_norm",
+      "state_b_rms_norm",
+      "state_ux_mean_norm",
+      "state_ux_rms_norm",
+      "state_uy_mean_norm",
+      "state_uy_rms_norm",
+      "log1p_canonical_buoyancy_advection_signal_rms_norm",
+      "log1p_canonical_buoyancy_forcing_signal_rms_norm",
+      "logRa",
+      "logPr"
+    ],
+
+    "future_features": false,
+    "ground_truth_features": false,
+    "temporal_extra_features": false,
+    "horizon_feature": false,
+    "pressure_feature": false
+  },
+
+  "formal_generation_protocol": {
+    "seed": 42,
+    "batch_size": 4,
+    "max_horizon": 4,
+    "temporal_stride": 1,
+    "window_policy": "all legal H4 windows",
+    "allowed_data_splits": [
+      "train",
+      "val"
+    ],
+    "test_forbidden": true
+  },
+
+  "pre_freeze_dry_run_coverage": {
+    "max_samples_per_run": 4,
+    "expected_rows_per_run": 32,
+
+    "unseen_pr_train": {
+      "status": "PASS",
+      "rows": 32,
+      "gain_help_mismatch": 0,
+      "numeric_finite": true,
+      "test_accessed": false
+    },
+
+    "unseen_pr_val": {
+      "status": "PASS",
+      "rows": 32,
+      "gain_help_mismatch": 0,
+      "numeric_finite": true,
+      "test_accessed": false
+    },
+
+    "unseen_ra_train": {
+      "status": "PASS",
+      "rows": 32,
+      "gain_help_mismatch": 0,
+      "numeric_finite": true,
+      "test_accessed": false
+    },
+
+    "unseen_ra_val": {
+      "status": "PASS",
+      "rows": 32,
+      "gain_help_mismatch": 0,
+      "numeric_finite": true,
+      "test_accessed": false
+    }
+  },
+
+  "numerical_audit_note": {
+    "issue_found": "float32 subtraction could erase extremely small nonzero term corrections in utility counterfactual arithmetic",
+    "resolution": "parent inference remains float32; only offline counterfactual target arithmetic and utility-error accumulation are promoted to float64",
+    "scientific_contract_changed": false,
+    "label_rule_changed": false
+  },
+
+  "freeze_policy": {
+    "generator_must_not_change_after_freeze": true,
+    "utility_definition_must_not_change_after_freeze": true,
+    "feature_definition_must_not_change_after_freeze": true,
+    "no_val_driven_label_threshold_tuning": true,
+    "no_test_access_before_formal_pretest_freeze": true
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "stage": "R3-3A",
+  "registry_role": "UTILITY_PREDICTABILITY_IMPLEMENTATION_FREEZE",
+  "status": "PRE_FREEZE_AUDIT_PASS",
+
+  "source": {
+    "path": "evaluation/audit_r3_3a_predictability.py",
+    "sha256": "3b9de522bb462746a3071bf27508e1e3896f4b8a9a3a2a5820aa5d6108848da7"
+  },
+
+  "upstream_frozen_provenance": {
+    "r3_3_contract_path": "configs/r3/r3_3_utility_contract.json",
+    "r3_3_contract_sha256": "426299fcce724d1e74490887c39ea58307f2180bf464c4d41ee6ee170b6c4af8",
+
+    "formal_utility_dataset_registry_path": "configs/r3/r3_3a_formal_utility_dataset_registry.json",
+    "formal_utility_dataset_registry_sha256": "97171f60689c8fe3c32746640a109b1fe554a091073f68536550711b7f273d40",
+
+    "formal_utility_dataset_freeze_commit": "cc4dfb12d62ea9940cb4e5ed7a32f43d7821f326",
+
+    "utility_target_generator_freeze_commit": "7963c0934aa49aa26b410f32829bc306f8d48ed5"
+  },
+
+  "causal_question": {
+    "primary": "Does current-state information improve per-term Utility predictability beyond the capacity-matched parameter-only control?",
+    "primary_contrast": "StateUtility - ParamUtility",
+    "interpretation_scope": "current-state information value specifically for Utility/state selection"
+  },
+
+  "utility_terms": [
+    "buoyancy_advection",
+    "buoyancy_forcing"
+  ],
+
+  "matched_arms": {
+    "ParamUtility": {
+      "input_dim": 10,
+      "visible_information": [
+        "logRa",
+        "logPr"
+      ],
+      "state_dimensions_0_to_7": "exact zero after shared TRAIN-only normalization"
+    },
+
+    "StateUtility": {
+      "input_dim": 10,
+      "visible_information": [
+        "state_b_mean_norm",
+        "state_b_rms_norm",
+        "state_ux_mean_norm",
+        "state_ux_rms_norm",
+        "state_uy_mean_norm",
+        "state_uy_rms_norm",
+        "log1p_canonical_buoyancy_advection_signal_rms_norm",
+        "log1p_canonical_buoyancy_forcing_signal_rms_norm",
+        "logRa",
+        "logPr"
+      ]
+    }
+  },
+
+  "feature_normalization": {
+    "fit_split": "TRAIN only",
+    "statistics": "shared between ParamUtility and StateUtility within each split axis",
+    "feature_dim": 10,
+    "order": [
+      "fit mean/std on full TRAIN 10D features",
+      "normalize full 10D features",
+      "for ParamUtility set normalized dimensions 0..7 to exact zero",
+      "for StateUtility retain all normalized dimensions"
+    ],
+    "val_statistics_fit": false,
+    "test_statistics_fit": false
+  },
+
+  "classifier_contract": {
+    "per_term_classifiers": 2,
+    "architecture": "Linear(10,32)-GELU-Linear(32,16)-GELU-Linear(16,1)",
+    "parameters_per_classifier": 897,
+    "loss": "BCEWithLogitsLoss",
+    "optimizer": "Adam",
+    "learning_rate": 0.001,
+    "formal_epochs": 100,
+    "batch_size": 512,
+    "seed": 42,
+
+    "matched_initialization": true,
+    "matched_batch_schedule": true,
+
+    "initialization_seeds": {
+      "buoyancy_advection": 42,
+      "buoyancy_forcing": 1042
+    },
+
+    "batch_schedule_seeds": {
+      "buoyancy_advection": 10042,
+      "buoyancy_forcing": 10043
+    },
+
+    "class_weighting": false,
+    "checkpoint_selection": "final epoch only"
+  },
+
+  "auc_contract": {
+    "metric": "binary ROC-AUC",
+    "implementation": "pure NumPy Mann-Whitney rank statistic",
+    "tie_handling": "average ranks",
+    "sklearn_dependency": false,
+
+    "unit_audit": {
+      "perfect": 1.0,
+      "reversed": 0.0,
+      "all_tied": 0.5,
+      "standard_example": 0.75,
+      "status": "PASS"
+    }
+  },
+
+  "data_usage_policy": {
+    "classifier_fit": "formal TRAIN rows only",
+    "val_role": "diagnostic AUC only",
+    "val_model_selection": false,
+    "val_feature_selection": false,
+    "val_threshold_tuning": false,
+    "val_temperature_tuning": false,
+    "test_access": false
+  },
+
+  "pre_freeze_validation": {
+    "audit_only": {
+      "unseen_pr": "PASS",
+      "unseen_ra": "PASS"
+    },
+
+    "matched_training_debug": {
+      "epochs": 2,
+      "unseen_pr": "PASS",
+      "unseen_ra": "PASS",
+      "purpose": "training-pipeline validation only",
+      "scientific_result_status": "DEBUG_ONLY_NOT_FORMAL"
+    },
+
+    "post_debug_source_change": {
+      "scope": "provenance-only Git commit ancestry audit",
+      "classifier_semantics_changed": false,
+      "feature_semantics_changed": false,
+      "training_semantics_changed": false,
+      "auc_semantics_changed": false,
+      "post_change_audit_only_unseen_pr": "PASS",
+      "post_change_audit_only_unseen_ra": "PASS"
+    }
+  },
+
+  "formal_execution_policy": {
+    "split_axes": [
+      "unseen_pr",
+      "unseen_ra"
+    ],
+    "classifiers_per_axis": 4,
+    "formal_epochs": 100,
+    "no_redesign_after_val_auc": true,
+    "no_feature_change_after_val_auc": true,
+    "no_arm_selection_from_val": true,
+    "no_test_before_pretest_freeze": true
+  },
+
+  "freeze_policy": {
+    "source_must_not_change_after_commit": true,
+    "formal_training_must_use_exact_source_sha": true,
+    "formal_training_must_use_exact_dataset_registry_sha": true,
+    "any_future_change_requires_explicit_new_freeze_before_results": true
+  }
+}

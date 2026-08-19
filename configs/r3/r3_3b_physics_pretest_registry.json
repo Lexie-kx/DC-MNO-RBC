@@ -1,0 +1,86 @@
+{
+  "stage": "R3-3B",
+  "registry_role": "PHYSICS_SUPPORTIVE_PRETEST_FREEZE",
+  "registry_status": "LOCKED_BEFORE_FORMAL_PHYSICS_TEST",
+
+  "physics_role": "supportive_only",
+  "prediction_conclusion_already_frozen": true,
+
+  "primary_comparison": {
+    "comparison": "R3-3B-b-StateUtility - R3-3B-a-ParamUtility",
+    "interpretation": "incremental physics behavior of current-state information specifically for Utility/state selection",
+    "negative_difference_means": "StateUtility better"
+  },
+
+  "frozen_sources": {
+    "r3_3_physics_evaluator": {
+      "path": "evaluation/evaluate_cross_param_rollout_physics_r3_3.py",
+      "sha256": "6e55edeee8a166f6613b845c3fe5743a4a218a86883d7e3dc394bb099533d6c9"
+    },
+
+    "r3_3_rollout_evaluator_sha256": "104e3db55561368d961865c16bda385717b3fb1cdbda1e4be3dafc8fe9800987",
+    "r3_2_physics_evaluator_sha256": "fd56ef510b59664cede536904c26c65cb386ec99c23ef53ea4b72228a6ab0740",
+    "r3_1_physics_evaluator_sha256": "70233daa37a64c1207e57896a7670f469d0a04d5d668c637d05f62d57d2de0b0",
+
+    "r3_3_pretest_registry_sha256": "2c4e06cb5dd4face1de29c7a45e4fbf0b724b2bb63ed1e020393ea8545dad9cc",
+    "r3_3_formal_rollout_registry_sha256": "ba13abfc77e91fa153b93a64a3c5d2ca390047c6f2f6a0bcbb1b2a86ae89dd2a",
+
+    "r3_3_pretest_freeze_commit": "247f49db4655b430d5142c2bbcd26f28c1acf611",
+    "r3_3_rollout_result_freeze_commit": "2c501a98559271c69e8fa4be087dea6c41754820"
+  },
+
+  "formal_protocol": {
+    "seed": 42,
+    "batch_size": 4,
+    "horizons": [1, 4, 8, 16],
+    "max_horizon": 16,
+    "formal_test_windows_per_split": 2430,
+    "sampling": "same all-legal TEST windows, stride 1",
+    "rollout": "free autoregressive",
+    "neural_operator_training": false,
+    "physics_test_accessed_before_freeze": false
+  },
+
+  "physics_semantics": {
+    "type": "FD-based comparative proxy",
+    "not_solver_level_pde_violation": true,
+    "metric_source": "frozen R3-1 Physics-Audit-v2",
+    "wrapper_only_changes_prediction_rule": true,
+    "physics_metric_definitions_changed": false
+  },
+
+  "utility_wrapper_semantics": {
+    "parent": "frozen split-matched R3-2b StateParam",
+    "formula": "base_delta_norm + q_adv * term_correction_adv + q_force * term_correction_force",
+    "term_correction_already_contains_alpha": true,
+    "alpha_multiplied_twice": false,
+    "paramutility_mask": "normalized dims 0..7 exact zero",
+    "stateutility_visibility": "all normalized 10D",
+    "q": "sigmoid(frozen classifier logit)",
+    "threshold": false,
+    "temperature": false,
+    "special_step1_rule": false
+  },
+
+  "audit_only_status": {
+    "unseen_pr": {
+      "passed": true,
+      "physics_test_dataset_constructed": false
+    },
+    "unseen_ra": {
+      "passed": true,
+      "physics_test_dataset_constructed": false
+    }
+  },
+
+  "forbidden_after_freeze": [
+    "changing physics metric definitions",
+    "changing Utility wrapper semantics",
+    "changing Utility classifiers",
+    "changing the frozen R3-2b parent",
+    "changing q threshold or temperature",
+    "special-casing step 1",
+    "physics-TEST-driven redesign",
+    "using physics results to alter the already-frozen prediction conclusion"
+  ]
+}
